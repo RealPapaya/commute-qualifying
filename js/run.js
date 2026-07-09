@@ -234,9 +234,9 @@ function bearing(from, to) {
 
 // ---------- GPS session ----------
 
-async function armGps() {
-  if (!navigator.geolocation) {
-    setStatus('Geolocation not available in this browser.', '');
+function armGps() {
+  if (!window.isSecureContext || !navigator.geolocation) {
+    setStatus('此頁面不是安全來源，瀏覽器不提供 GPS。請改用 https:// 或 localhost 開啟。', '');
     return;
   }
   run = createRun(route);
@@ -245,23 +245,46 @@ async function armGps() {
   $('btn-abort').hidden = false;
   renderBoard();
 
-  try {
-    wakeLock = await navigator.wakeLock?.request('screen');
-    wakeLock?.addEventListener('release', () => { wakeLock = null; });
-  } catch { /* wake lock unsupported — screen may sleep */ }
-
+  // Must run while the click's user activation is still live: iOS Safari fails
+  // a geolocation request made after an await with PERMISSION_DENIED, silently
+  // and even when the origin was already granted. Wake lock is requested after.
   watchId = navigator.geolocation.watchPosition(pos => {
     const acc = pos.coords.accuracy;
     $('gps-info').textContent =
       `GPS accuracy: ±${Math.round(acc)} m ${acc > MAX_ACCURACY_M ? '(too poor — fix ignored)' : ''}`;
     if (acc > MAX_ACCURACY_M) return;
     handleFix({ lat: pos.coords.latitude, lng: pos.coords.longitude, t: pos.timestamp });
-  }, err => {
-    setStatus(`GPS error: ${err.message}. Check location permission.`, '');
-    stopSession();
-  }, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
+  }, onGpsError, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
 
   startClock(() => Date.now());
+  requestWakeLock();
+}
+
+async function requestWakeLock() {
+  try {
+    wakeLock = await navigator.wakeLock?.request('screen');
+    wakeLock?.addEventListener('release', () => { wakeLock = null; });
+  } catch { /* wake lock unsupported — screen may sleep */ }
+}
+
+// Only PERMISSION_DENIED ends the watch; the other two are transient (tunnel,
+// cold start indoors) and fixes resume on their own, so the session stays live.
+function onGpsError(err) {
+  if (err.code === err.PERMISSION_DENIED) {
+    setStatus('GPS 權限被拒。若網頁上已按過允許，請檢查系統的定位權限：' +
+      'iOS → 設定 → 隱私權與安全性 → 定位服務 → Safari；' +
+      'Android → 設定 → 應用程式 → Chrome → 權限 → 位置。', '');
+    stopSession();
+    return;
+  }
+  const why = err.code === err.TIMEOUT
+    ? '收不到定位（隧道或室內？）'
+    : '定位暫時無法取得';
+  // Mid-lap, park the notice in gps-info: the next good fix overwrites it, so
+  // it clears itself. Touching the status line would bury LIVE until the next
+  // sector boundary rewrites it.
+  if (run?.state === 'running') $('gps-info').textContent = `${why} — 等待 GPS 回復…`;
+  else setStatus(`${why} — 仍在等待 GPS。`, 'armed');
 }
 
 // ---------- Simulator ----------
