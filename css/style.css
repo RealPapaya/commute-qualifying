@@ -964,3 +964,248 @@ body {
     font-size: 58px;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   F1-style post-run summary card.
+   Every dimension is a multiple of --u, one 224th of the card width, so the
+   card scales from a single custom property. The magic numbers are pixel
+   positions traced off the reference card at that width.
+   --------------------------------------------------------------------------- */
+
+.summary-overlay {
+  position: fixed;
+  inset: 0;
+  /* above #topbar (3000) and the mobile off-route flag (5000) */
+  z-index: 6000;
+  display: grid;
+  place-items: center;
+  overflow: auto;
+  background: #2d2d2d;
+}
+
+.summary-overlay[hidden] { display: none; }
+
+.f1c-host {
+  --cw: min(calc(100vw - 20px), calc((100dvh - 20px) * 224 / 490), 430px);
+  --u: calc(var(--cw) / 224);
+}
+
+.f1c-close {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, .35);
+  color: #fff;
+  font: 700 16px/1 system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.f1c-card {
+  width: var(--cw);
+  box-sizing: border-box;
+  background: #fff;
+  border-radius: calc(13 * var(--u));
+  overflow: hidden;
+  color: #15151e;
+  font-family: 'Archivo', system-ui, sans-serif;
+  /* Formula1 Display is a wide face; Archivo's wdth axis stands in for it.
+     Per-element widths are tuned so glyph runs match the reference. */
+  --w-num: 120;
+  --w-title: 120;
+  --w-label: 100;
+  --w-eyebrow: 96;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Substitute face has no slashed zero; Formula1 Display does. Strike it in. */
+.f1c-zero {
+  position: relative;
+  display: inline-block;
+}
+
+.f1c-zero::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 12%;
+  bottom: 12%;
+  width: .085em;
+  margin-left: -.0425em;
+  background: currentColor;
+  transform: rotate(19deg);
+}
+
+/* --- header --- */
+
+.f1c-head {
+  display: flex;
+  align-items: stretch;
+  padding: calc(24 * var(--u)) 0 0 calc(13 * var(--u));
+}
+
+.f1c-mark {
+  flex: 0 0 calc(41 * var(--u));
+  font: 900 calc(16 * var(--u)) / 1 'Archivo', sans-serif;
+  font-variation-settings: 'wdth' var(--w-title);
+  letter-spacing: calc(-1 * var(--u));
+  padding-top: calc(4 * var(--u));
+}
+
+.f1c-head-text {
+  margin-left: calc(15 * var(--u));
+  padding: 0 0 calc(6 * var(--u)) calc(6 * var(--u));
+  border-left: 1px solid #e6e6e6;
+}
+
+.f1c-eyebrow {
+  font: 700 calc(8.8 * var(--u)) / calc(11 * var(--u)) 'Archivo', sans-serif;
+  font-variation-settings: 'wdth' var(--w-eyebrow);
+  letter-spacing: .01em;
+}
+
+.f1c-title {
+  margin-top: calc(5 * var(--u));
+  font: 800 calc(9.0 * var(--u)) / calc(11 * var(--u)) 'Archivo', sans-serif;
+  font-variation-settings: 'wdth' var(--w-title);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+/* --- track --- */
+
+.f1c-track {
+  height: calc(168 * var(--u));
+  margin-top: calc(17 * var(--u));
+  padding: 0 calc(16 * var(--u));
+}
+
+.f1c-track-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.f1c-corner {
+  fill: #15151e;
+  font: 700 30px 'Archivo', sans-serif;
+}
+
+/* --- stats --- */
+
+.f1c-stats {
+  padding: calc(25 * var(--u)) calc(16 * var(--u)) 0;
+}
+
+.f1c-stat-row {
+  display: grid;
+  grid-template-columns: calc(101 * var(--u)) 1fr;
+}
+
+.f1c-stats > .f1c-stat-row { margin-top: calc(12 * var(--u)); }
+.f1c-stats > .f1c-stat-row + .f1c-stat-row { margin-top: calc(8 * var(--u)); }
+
+.f1c-stat-label {
+  font: 700 calc(7 * var(--u)) / 1 'Archivo', sans-serif;
+  font-variation-settings: 'wdth' var(--w-label);
+  letter-spacing: .03em;
+  white-space: nowrap;
+}
+
+.f1c-stat-value {
+  margin-top: calc(6 * var(--u));
+  font: 800 calc(12.6 * var(--u)) / 1 'Archivo', sans-serif;
+  font-variation-settings: 'wdth' var(--w-num);
+  letter-spacing: -.005em;
+}
+
+.f1c-stat-value-big {
+  margin-top: calc(5 * var(--u));
+  font-size: calc(18.4 * var(--u));
+  letter-spacing: -.012em;
+}
+
+/* --- bottom panel --- */
+
+.f1c-panel {
+  margin: calc(20 * var(--u)) calc(13 * var(--u)) calc(18 * var(--u));
+  padding: calc(5 * var(--u));
+  border-radius: calc(3 * var(--u));
+  background: #dedede;
+}
+
+.f1c-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: calc(12 * var(--u));
+  padding: 0 calc(5 * var(--u));
+  border-radius: calc(2 * var(--u));
+  background: #020202;
+  color: #fff;
+}
+
+.f1c-bar-round {
+  font: 700 calc(5.6 * var(--u)) / 1 'Archivo', sans-serif;
+  font-variation-settings: 'wdth' var(--w-label);
+  letter-spacing: .05em;
+}
+
+.f1c-bar-tag {
+  font: 800 calc(7.6 * var(--u)) / 1 'Archivo', sans-serif;
+  font-variation-settings: 'wdth' var(--w-title);
+  letter-spacing: .01em;
+}
+
+.f1c-panel-body {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: calc(8 * var(--u)) calc(4 * var(--u)) calc(1 * var(--u)) calc(3 * var(--u));
+}
+
+.f1c-times-label {
+  font: 700 calc(7.25 * var(--u)) / 1 'Archivo', sans-serif;
+  font-variation-settings: 'wdth' 62;
+  letter-spacing: .01em;
+}
+
+.f1c-mytime {
+  margin-top: calc(2 * var(--u));
+  font: 800 calc(21.74 * var(--u)) / 1 'Archivo', sans-serif;
+  font-variation-settings: 'wdth' 108;
+  letter-spacing: -.015em;
+}
+
+.f1c-tracktime {
+  display: flex;
+  align-items: baseline;
+  gap: calc(10 * var(--u));
+  margin-top: calc(2 * var(--u));
+}
+
+.f1c-tracktime-value {
+  font: 700 calc(7.97 * var(--u)) / 1 'Archivo', sans-serif;
+  font-variation-settings: 'wdth' 86;
+}
+
+.f1c-badge {
+  text-align: right;
+  padding-bottom: 0;
+}
+
+.f1c-badge-num {
+  font: 800 calc(20.29 * var(--u)) / 1 'Archivo', sans-serif;
+  font-variation-settings: 'wdth' 78;
+  letter-spacing: -.02em;
+}
+
+.f1c-badge-team {
+  margin-top: calc(3 * var(--u));
+  font: 800 calc(8.7 * var(--u)) / calc(9 * var(--u)) 'Archivo', sans-serif;
+  font-variation-settings: 'wdth' 62;
+  letter-spacing: .02em;
+}

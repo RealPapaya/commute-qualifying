@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<!--
+  Renders the real summary card with the reference image's own content, framed
+  to the reference's exact 234x497 so it can be pixel-diffed against
+  結算.png. Nothing here is app code — only the data differs from production.
+  Serve from the repo root: node test/shot.mjs http://localhost:8080/test/summary-fixture.html ...
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Summary card fixture</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    html, body { margin: 0; padding: 0; background: #2d2d2d; }
+    /* The reference is a 234x497 frame with the card at (5,5), 224x490. */
+    #frame {
+      position: relative;
+      width: 234px;
+      height: 497px;
+      overflow: hidden;
+      background: #2d2d2d;
+    }
+    #frame .f1c-host {
+      position: absolute;
+      top: 5px;
+      left: 5px;
+      --cw: 224px;
+      --u: 1px;
+    }
+  </style>
+</head>
+<body>
+  <div id="frame"><div class="f1c-host"></div></div>
+
+  <script type="module">
+    import { renderSummary } from '../js/summary.js';
+
+    // Adelaide Street Circuit, traced coarsely off the reference map. Only the
+    // shape matters — the diff masks this region, since a user's route is
+    // never this track.
+    const ADELAIDE = [
+      [-34.9200, 138.6100], [-34.9188, 138.6155], [-34.9182, 138.6205],
+      [-34.9160, 138.6230], [-34.9128, 138.6238], [-34.9105, 138.6262],
+      [-34.9098, 138.6300], [-34.9112, 138.6340], [-34.9140, 138.6352],
+      [-34.9175, 138.6345], [-34.9205, 138.6330], [-34.9235, 138.6318],
+      [-34.9262, 138.6295], [-34.9270, 138.6258], [-34.9258, 138.6222],
+      [-34.9240, 138.6198], [-34.9248, 138.6165], [-34.9272, 138.6140],
+      [-34.9280, 138.6105], [-34.9262, 138.6072], [-34.9228, 138.6062],
+      [-34.9205, 138.6078], [-34.9200, 138.6100],
+    ];
+
+    renderSummary(document.querySelector('.f1c-host'), {
+      eyebrow: 'AUSTRALIA',
+      title1: 'ADELAIDE',
+      title2: 'STREET CIRCUIT',
+      route: { points: ADELAIDE, sectorBoundaries: [], lights: [] },
+      lengthM: 5278,
+      firstYear: 1996,
+      laps: 58,
+      fastest: 79813,            // 1:19.813
+      raceDistanceM: 306124,
+      round: 9,
+      date: '11-13 FEB',
+      tag: 'Australia',
+      myTime: 930000,            // 15:30
+      trackTime: 930000,
+      badge: { num: '18', l1: 'ASTON', l2: 'MARTIN' },
+    });
+
+    document.fonts.ready.then(() => { document.body.dataset.ready = '1'; });
+  </script>
+</body>
+</html>

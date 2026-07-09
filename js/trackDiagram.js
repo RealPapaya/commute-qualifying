@@ -73,6 +73,67 @@ export function splitIntoSectors(points, sectorBoundaries) {
   return segments;
 }
 
+// Signed turn (degrees) from vector a→b onto b→c, in projected screen space.
+// Positive = clockwise on screen. Returns 0 for degenerate (zero-length) legs.
+function signedTurnDeg(a, b, c) {
+  const v1x = b[0] - a[0], v1y = b[1] - a[1];
+  const v2x = c[0] - b[0], v2y = c[1] - b[1];
+  if ((!v1x && !v1y) || (!v2x && !v2y)) return 0;
+  return Math.atan2(v1x * v2y - v1y * v2x, v1x * v2x + v1y * v2y) * 180 / Math.PI;
+}
+
+function unit([x, y]) {
+  const l = Math.hypot(x, y) || 1;
+  return [x / l, y / l];
+}
+
+// Find the corners of a route the way an F1 circuit map numbers them: points
+// where the heading swings more than `minAngleDeg` across a `windowM` window,
+// thinned so two corners are never closer than `minGapM` along the route.
+//
+// Angles are measured in the projected plane (computeProjection scales both
+// axes by the same factor, so it preserves angles). `outward` is the unit
+// vector pointing away from the centre of the turn — where a corner number
+// goes so it never lands on the track.
+export function detectCorners(points, opts = {}) {
+  const { minAngleDeg = 30, windowM = 20, minGapM = 45 } = opts;
+  if (!points || points.length < 3) return [];
+  const cum = cumulativeDistances(points);
+  const total = cum.at(-1);
+  if (!(total > 0)) return [];
+
+  const { project } = computeProjection(points);
+  const at = d => project(pointAtDistance(points, cum, Math.max(0, Math.min(total, d))));
+
+  const candidates = [];
+  for (let i = 1; i < points.length - 1; i++) {
+    const d = cum[i];
+    if (d < windowM || d > total - windowM) continue;
+    const b = project(points[i]);
+    const a = at(d - windowM);
+    const c = at(d + windowM);
+    const turn = signedTurnDeg(a, b, c);
+    if (Math.abs(turn) < minAngleDeg) continue;
+    // (u2 - u1) points into the turn; the label belongs on the far side.
+    const u1 = unit([b[0] - a[0], b[1] - a[1]]);
+    const u2 = unit([c[0] - b[0], c[1] - b[1]]);
+    const inward = unit([u2[0] - u1[0], u2[1] - u1[1]]);
+    candidates.push({
+      index: i, distance: d, point: points[i], turn,
+      strength: Math.abs(turn),
+      outward: [-inward[0], -inward[1]],
+    });
+  }
+
+  // Non-max suppression: keep the sharpest, drop anything too close to it.
+  const kept = [];
+  for (const c of [...candidates].sort((x, y) => y.strength - x.strength)) {
+    if (kept.every(k => Math.abs(k.distance - c.distance) >= minGapM)) kept.push(c);
+  }
+  kept.sort((a, b) => a.distance - b.distance);
+  return kept.map((c, i) => ({ ...c, number: i + 1 }));
+}
+
 // ---- DOM rendering ----
 
 const NS = 'http://www.w3.org/2000/svg';

@@ -171,6 +171,13 @@ async function simulateLap(tag) {
     null, { timeout: 240000 });
   console.log(tag, await page.locator('#run-status').textContent());
   await shot(`${tag}-finish`);
+
+  // Finishing raises the F1-style summary card over the whole run view; capture
+  // it, then dismiss it or the next click lands on the overlay instead.
+  await page.waitForSelector('#summary-overlay .f1c-card', { timeout: 15000 });
+  await shot(`${tag}-summary`);
+  await page.click('.f1c-close');
+  await page.waitForSelector('#summary-overlay[hidden]', { timeout: 5000 });
 }
 await simulateLap('7-lap1');
 await simulateLap('8-lap2'); // vs PB: mix of purple/green/yellow

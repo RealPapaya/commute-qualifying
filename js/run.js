@@ -3,8 +3,9 @@
 import { cumulativeDistances, pointAtDistance, haversine, projectOnRoute } from './geo.js';
 import { createRun, feedFix, elapsed, classifySector, fmtTime, fmtDelta,
          MAX_ACCURACY_M, OFF_ROUTE_M } from './timing.js';
-import { allTimeBests, saveRun, newId } from './store.js';
+import { allTimeBests, saveRun, newId, listRuns } from './store.js';
 import { renderTrackDiagram } from './trackDiagram.js';
+import { initSummary, showSummary } from './summary.js';
 
 let map, routeLayer = null, posMarker = null;
 let route = null;          // active route (with points/cum attached)
@@ -87,6 +88,7 @@ export function initRun(callbacks) {
   $('run-cursor-type').addEventListener('change', () => setCursorType(selectedCursorType()));
   cursorType = selectedCursorType();
   sessionBests = [];
+  initSummary();
 }
 
 export function openRun(r) {
@@ -430,6 +432,7 @@ function finishRun() {
   setStatus(`FINISHED — ${fmtTime(totalTime)}${record.simulated ? ' (simulated)' : ''}`, 'live');
   $('run-clock').textContent = fmtTime(totalTime);
   stopSession(null, /*keepBoard*/ true);
+  showSummary(route, record, listRuns(route.id));
   onRunSaved?.(record);
 }
 
