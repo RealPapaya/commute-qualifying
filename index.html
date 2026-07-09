@@ -52,9 +52,16 @@
         <button id="btn-clear-route" class="btn danger">Clear trace</button>
         <button id="btn-add-sector" class="btn">+ Sector</button>
         <button id="btn-remove-sector" class="btn">− Sector</button>
+        <button id="btn-track-diagram" class="btn" disabled title="Show F1-style circuit diagram">🏁 賽道圖</button>
         <button id="btn-save-route" class="btn primary">Save</button>
       </div>
       <div id="sector-summary" class="sector-summary"></div>
+    </div>
+    <div id="track-diagram-overlay" class="track-diagram-overlay" hidden>
+      <div class="track-diagram-head">
+        <button id="btn-diagram-back" class="btn">← 編輯</button>
+      </div>
+      <div id="track-diagram-svg" class="track-diagram-svg"></div>
     </div>
   </section>
 

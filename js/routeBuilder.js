@@ -2,6 +2,9 @@
 // lines), mark traffic lights (with Street View link-out), edit sectors.
 import { cumulativeDistances } from './geo.js';
 import { initSectorTool, renderSectorHandles, defaultBoundaries } from './sectors.js';
+import { initRouteDrag } from './routeDrag.js';
+import { initLightsImport } from './lightsImport.js';
+import { renderTrackDiagram } from './trackDiagram.js';
 import { saveRoute, getRoute, newId } from './store.js';
 
 const OSRM = 'https://router.project-osrm.org/route/v1/driving/';
@@ -10,6 +13,7 @@ let map, route, activeTool = 'trace';
 let routeLine, wpMarkers = [], lightMarkers = [];
 let onSaved = null;
 let buildSeq = 0; // stale-response guard for async OSRM rebuilds
+let afterRebuildHandlers = []; // hooks run once the polyline/markers are freshly redrawn
 
 const TOOL_HELP = {
   trace: 'Click the map to add waypoints along your commute. Drag a point to move it, double-click a point to delete it.',
@@ -37,8 +41,24 @@ export function initEditor(callbacks) {
   document.getElementById('btn-save-route').addEventListener('click', persist);
   document.getElementById('btn-add-sector').addEventListener('click', () => changeSectorCount(+1));
   document.getElementById('btn-remove-sector').addEventListener('click', () => changeSectorCount(-1));
+  document.getElementById('btn-track-diagram').addEventListener('click', showTrackDiagram);
+  document.getElementById('btn-diagram-back').addEventListener('click', hideTrackDiagram);
 
   initSectorTool(map, () => route, refreshSectorSummary);
+  initRouteDrag({
+    map,
+    getRoute: () => route,
+    getPolyline: () => routeLine,
+    rebuild: rebuildGeometry,
+    onAfterRebuild,
+  });
+  initLightsImport({ getRoute: () => route, onImported: redrawLights, onAfterRebuild });
+}
+
+// Register a callback to run every time redrawAll() has recreated the
+// polyline/markers, so other modules can rebind handlers to the fresh layer.
+export function onAfterRebuild(fn) {
+  afterRebuildHandlers.push(fn);
 }
 
 export function openRoute(existing) {
@@ -55,6 +75,7 @@ export function openRoute(existing) {
   document.getElementById('route-name').value = route.name;
   document.getElementById('snap-toggle').checked = route.snap !== false;
   setTool('trace');
+  hideTrackDiagram();
   redrawAll();
   setTimeout(() => {
     map.invalidateSize(); // container may have been hidden — fix size before fitting
@@ -171,6 +192,7 @@ function redrawAll() {
   renderSectorHandles(activeTool === 'sector');
   refreshSectorSummary();
   refreshStats();
+  afterRebuildHandlers.forEach(fn => fn());
 }
 
 function redrawLine() {
@@ -241,6 +263,20 @@ function refreshStats() {
   const total = cum ? (cum.at(-1) / 1000).toFixed(2) : '0.00';
   document.getElementById('route-stats').textContent =
     `${total} km · ${route.lights.length} 🚦 · ${route.sectorBoundaries.length + 1} sectors`;
+  document.getElementById('btn-track-diagram').disabled = route.points.length <= 1;
+}
+
+// Overlay a stylized F1-circuit-style diagram of the current in-memory
+// route on top of the editor (map + tool UI stay alive underneath, just
+// covered — so no invalidateSize gymnastics are needed on return).
+function showTrackDiagram() {
+  if (!route || route.points.length < 2) return;
+  renderTrackDiagram(document.getElementById('track-diagram-svg'), route);
+  document.getElementById('track-diagram-overlay').hidden = false;
+}
+
+function hideTrackDiagram() {
+  document.getElementById('track-diagram-overlay').hidden = true;
 }
 
 function persist() {

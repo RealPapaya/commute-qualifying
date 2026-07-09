@@ -58,6 +58,67 @@ for (let i = 0; i < wps.length; i++) {
 console.log('traced:', await stats());
 await shot('1-route-traced');
 
+// ---- 1a2. Feature B: F1-circuit-style track diagram overlay, then back to
+// editor with state intact. The diagram overlays the map (higher z-index)
+// rather than hiding it via display:none, so "editor map hidden" is checked
+// as "the diagram overlay is visible on top of it".
+await page.click('#btn-track-diagram');
+await page.waitForSelector('#track-diagram-svg svg path');
+const diagramPathCount = await page.locator('#track-diagram-svg svg path').count();
+console.log('track diagram path elements:', diagramPathCount);
+if (diagramPathCount === 0) throw new Error('track diagram rendered no path elements');
+if (await page.locator('#track-diagram-overlay').isHidden()) {
+  throw new Error('track diagram overlay did not become visible');
+}
+await shot('1a2-track-diagram');
+await page.click('#btn-diagram-back');
+await page.waitForSelector('.wp-marker', { state: 'visible' });
+console.log('editor restored after track diagram back, wp-markers:',
+  await page.locator('.wp-marker').count());
+
+// ---- 1a. Feature C: traffic lights should appear automatically after
+// tracing (live Overpass query, no manual light-tool clicks). Best-effort
+// only — real OSM signal coverage near this route and Overpass's own
+// availability aren't guaranteed, so this logs rather than failing the run;
+// a genuine regression (e.g. a thrown error in lightsImport.js) is still
+// caught by the pageerror listener below.
+const autoLights = await page.waitForFunction(() =>
+  document.querySelectorAll('.light-icon').length > 0, null, { timeout: 20000 })
+  .then(() => true)
+  .catch(() => false);
+console.log('auto-imported lights appeared:', autoLights,
+  autoLights ? `(${await page.locator('.light-icon').count()})` :
+    '(best-effort: depends on live Overpass + OSM signal coverage near the route)');
+if (autoLights) await shot('1a-lights-auto-imported');
+
+// ---- 1b. Feature A: drag the middle of the route path itself (not a
+// waypoint marker) — should splice in a new via waypoint and reroute ----
+const wpCountBeforePathDrag = await page.locator('.wp-marker').count();
+const statsBeforePathDrag = await stats();
+const pathMid = await page.evaluate(() => {
+  const map = window._editorMap;
+  let line = null;
+  map.eachLayer(l => { if (l instanceof L.Polyline) line = l; });
+  const latlngs = line.getLatLngs();
+  const mid = latlngs[Math.floor(latlngs.length / 2)];
+  return map.latLngToContainerPoint(mid);
+});
+const editorBox = await page.locator('#editor-map').boundingBox();
+await page.mouse.move(editorBox.x + pathMid.x, editorBox.y + pathMid.y);
+await page.mouse.down();
+await page.mouse.move(editorBox.x + pathMid.x + 35, editorBox.y + pathMid.y - 25, { steps: 12 });
+await page.mouse.up();
+await page.waitForFunction(n =>
+  document.querySelectorAll('.wp-marker').length === n, wpCountBeforePathDrag + 1,
+  { timeout: 20000 });
+const statsAfterPathDrag = await stats();
+console.log('path-drag waypoints:', wpCountBeforePathDrag, '->',
+  await page.locator('.wp-marker').count(), '| stats:', statsBeforePathDrag, '->', statsAfterPathDrag);
+if (statsAfterPathDrag === statsBeforePathDrag) {
+  throw new Error('path drag did not change route geometry');
+}
+await shot('1b-path-dragged');
+
 // ---- 2. manual edit: drag the 2nd waypoint ~1 km east, route re-snaps ----
 const wpEl = page.locator('.wp-marker').nth(1);
 const wpBox = await wpEl.boundingBox();

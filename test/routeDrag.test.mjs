@@ -1,0 +1,40 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { findInsertIndex } from '../js/routeDrag.js';
+import { pointAtDistance, cumulativeDistances } from '../js/geo.js';
+
+// ---- fixture: 2 km straight route heading north, one point every 100 m
+// (mirrors the shape of an OSRM/straight-line route.points array) ----
+const M_PER_DEG_LAT = 111195;
+const routePoints = Array.from({ length: 21 },
+  (_, i) => [25.0 + (i * 100) / M_PER_DEG_LAT, 121.5]);
+const cum = cumulativeDistances(routePoints);
+
+test('findInsertIndex: midpoint of a 2-waypoint route inserts between them', () => {
+  const waypoints = [routePoints[0], routePoints[20]];
+  const grab = pointAtDistance(routePoints, cum, 1000); // dead center
+  assert.equal(findInsertIndex(waypoints, routePoints, grab), 1);
+});
+
+test('findInsertIndex: grab past the last via waypoint inserts before the end', () => {
+  const waypoints = [routePoints[0], routePoints[10], routePoints[20]]; // via at 1000 m
+  const grab = pointAtDistance(routePoints, cum, 1500); // between via (1000 m) and end (2000 m)
+  assert.equal(findInsertIndex(waypoints, routePoints, grab), 2);
+});
+
+test('findInsertIndex: grab near the start inserts before the first via waypoint', () => {
+  const waypoints = [routePoints[0], routePoints[10], routePoints[20]];
+  const grab = pointAtDistance(routePoints, cum, 300); // before the via at 1000 m
+  assert.equal(findInsertIndex(waypoints, routePoints, grab), 1);
+});
+
+test('findInsertIndex: off-route grab still projects to the nearest segment', () => {
+  const waypoints = [routePoints[0], routePoints[20]];
+  const p = pointAtDistance(routePoints, cum, 1000);
+  const grab = [p[0], p[1] + 0.0005]; // ~50 m east of the route
+  assert.equal(findInsertIndex(waypoints, routePoints, grab), 1);
+});
+
+test('findInsertIndex: fewer than 2 waypoints just appends', () => {
+  assert.equal(findInsertIndex([routePoints[0]], routePoints, routePoints[5]), 1);
+});
