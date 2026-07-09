@@ -43,6 +43,8 @@ export function initEditor(callbacks) {
   document.getElementById('btn-remove-sector').addEventListener('click', () => changeSectorCount(-1));
   document.getElementById('btn-track-diagram').addEventListener('click', showTrackDiagram);
   document.getElementById('btn-diagram-back').addEventListener('click', hideTrackDiagram);
+  document.getElementById('diagram-filter-checkpoints').addEventListener('change', refreshTrackDiagram);
+  document.getElementById('diagram-filter-lights').addEventListener('change', refreshTrackDiagram);
 
   initSectorTool(map, () => route, refreshSectorSummary);
   initRouteDrag({
@@ -266,17 +268,32 @@ function refreshStats() {
   document.getElementById('btn-track-diagram').disabled = route.points.length <= 1;
 }
 
-// Overlay a stylized F1-circuit-style diagram of the current in-memory
-// route on top of the editor (map + tool UI stay alive underneath, just
-// covered — so no invalidateSize gymnastics are needed on return).
+// Diagram mode renders the current in-memory route as a clean circuit view.
+// Filters re-render the SVG without disturbing the editor state underneath.
 function showTrackDiagram() {
   if (!route || route.points.length < 2) return;
-  renderTrackDiagram(document.getElementById('track-diagram-svg'), route);
+  resetTrackDiagramFilters();
+  refreshTrackDiagram();
   document.getElementById('track-diagram-overlay').hidden = false;
+  document.getElementById('view-editor').classList.add('diagram-mode');
 }
 
 function hideTrackDiagram() {
   document.getElementById('track-diagram-overlay').hidden = true;
+  document.getElementById('view-editor').classList.remove('diagram-mode');
+}
+
+function resetTrackDiagramFilters() {
+  document.getElementById('diagram-filter-checkpoints').checked = true;
+  document.getElementById('diagram-filter-lights').checked = false;
+}
+
+function refreshTrackDiagram() {
+  if (!route || route.points.length < 2) return;
+  renderTrackDiagram(document.getElementById('track-diagram-svg'), route, {
+    showSectorCheckpoints: document.getElementById('diagram-filter-checkpoints').checked,
+    showLights: document.getElementById('diagram-filter-lights').checked,
+  });
 }
 
 function persist() {

@@ -145,6 +145,40 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.cursor-picker {
+  color: var(--dim);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  margin: 6px 0 8px;
+}
+.cursor-picker select {
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 7px 9px;
+  min-width: 128px;
+}
+
+.run-cursor-icon {
+  background: transparent;
+  border: 0;
+}
+.run-cursor-model {
+  width: 48px;
+  height: 48px;
+  transform: rotate(var(--heading, 0deg));
+  transform-origin: 50% 50%;
+  filter: drop-shadow(0 4px 5px rgba(0,0,0,0.55));
+  will-change: transform;
+}
+.run-cursor-model svg {
+  display: block;
+  width: 48px;
+  height: 48px;
+}
+
 .sector-board { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
 .sector-row {
   display: grid;
@@ -230,9 +264,35 @@ body {
 .track-diagram-head {
   padding: 8px 14px;
   border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.track-diagram-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.track-diagram-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-left: auto;
 }
 .track-diagram-svg { flex: 1; min-height: 0; display: flex; }
 .track-diagram-svg svg { width: 100%; height: 100%; }
 .track-label-name { fill: var(--text); font: 600 20px "Segoe UI", system-ui, sans-serif; }
 .track-label-stats { fill: var(--dim); font: 12px "Segoe UI", system-ui, sans-serif; }
 .track-label-tick { fill: var(--text); font: 11px "Segoe UI", system-ui, sans-serif; letter-spacing: 1px; }
+.track-label-checkpoint {
+  fill: var(--yellow);
+  stroke: #000;
+  stroke-width: 3px;
+  paint-order: stroke;
+  font: 700 12px "Segoe UI", system-ui, sans-serif;
+  letter-spacing: 0.5px;
+}
+.track-light-dot { opacity: 0.95; }

@@ -1,6 +1,6 @@
 // Live run: GPS session (or simulator) feeding the pure timing engine,
 // wake lock, and the F1-style sector board.
-import { cumulativeDistances, pointAtDistance } from './geo.js';
+import { cumulativeDistances, pointAtDistance, haversine } from './geo.js';
 import { createRun, feedFix, elapsed, classifySector, fmtTime, fmtDelta,
          MAX_ACCURACY_M } from './timing.js';
 import { allTimeBests, saveRun, newId } from './store.js';
@@ -15,8 +15,43 @@ let watchId = null, wakeLock = null, simTimer = null;
 let clockTimer = null;
 let simNow = null;         // simulated clock when replaying
 let onRunSaved = null;
+let cursorType = 'dot';
+let cursorLatLng = null;
+let cursorHeading = 0;
 
 const $ = id => document.getElementById(id);
+const CURSOR_TYPES = new Set(['dot', 'car', 'racecar', 'motorcycle']);
+const CURSOR_TURN_THRESHOLD_M = 3;
+const VEHICLE_MODELS = {
+  car: `<svg viewBox="0 0 48 48" aria-hidden="true">
+    <defs><linearGradient id="car-body" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6ee7ff"/><stop offset="0.55" stop-color="#1976d2"/><stop offset="1" stop-color="#063f82"/></linearGradient></defs>
+    <ellipse cx="24" cy="39" rx="15" ry="4" fill="rgba(0,0,0,.38)"/>
+    <path d="M17 33 L14 20 L19 10 H29 L34 20 L31 33 Z" fill="url(#car-body)" stroke="#061423" stroke-width="1.6"/>
+    <path d="M19 19 L21 12 H27 L29 19 Z" fill="#b8ecff" opacity=".9"/>
+    <path d="M17 24 H31" stroke="#d9f7ff" stroke-width="1.5" opacity=".65"/>
+    <circle cx="16" cy="31" r="3" fill="#111"/><circle cx="32" cy="31" r="3" fill="#111"/>
+    <circle cx="19" cy="13" r="1.7" fill="#fff7a8"/><circle cx="29" cy="13" r="1.7" fill="#fff7a8"/>
+  </svg>`,
+  racecar: `<svg viewBox="0 0 48 48" aria-hidden="true">
+    <defs><linearGradient id="race-body" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff8a80"/><stop offset="0.45" stop-color="#e10600"/><stop offset="1" stop-color="#6d0500"/></linearGradient></defs>
+    <ellipse cx="24" cy="39" rx="17" ry="4" fill="rgba(0,0,0,.42)"/>
+    <path d="M24 7 L33 21 L30 34 H18 L15 21 Z" fill="url(#race-body)" stroke="#190000" stroke-width="1.6"/>
+    <path d="M20 23 L24 12 L28 23 Z" fill="#20242e" opacity=".95"/>
+    <path d="M18 28 H30" stroke="#fff" stroke-width="2" opacity=".85"/>
+    <path d="M14 34 H34" stroke="#111" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="17" cy="32" r="2.8" fill="#111"/><circle cx="31" cy="32" r="2.8" fill="#111"/>
+    <circle cx="21" cy="15" r="1.6" fill="#fff3a0"/><circle cx="27" cy="15" r="1.6" fill="#fff3a0"/>
+  </svg>`,
+  motorcycle: `<svg viewBox="0 0 48 48" aria-hidden="true">
+    <ellipse cx="24" cy="39" rx="16" ry="4" fill="rgba(0,0,0,.36)"/>
+    <circle cx="15" cy="31" r="6" fill="#111"/><circle cx="33" cy="31" r="6" fill="#111"/>
+    <circle cx="15" cy="31" r="3.5" fill="#3b3f4a"/><circle cx="33" cy="31" r="3.5" fill="#3b3f4a"/>
+    <path d="M18 29 L23 17 L30 29 Z" fill="#ffd600" stroke="#221d00" stroke-width="1.8" stroke-linejoin="round"/>
+    <path d="M23 17 L28 12 M29 14 L35 18" stroke="#eceff1" stroke-width="2.2" stroke-linecap="round"/>
+    <path d="M20 20 L16 14" stroke="#00c853" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="16" cy="13" r="3" fill="#10131a"/>
+  </svg>`,
+};
 
 export function initRun(callbacks) {
   onRunSaved = callbacks.onRunSaved;
@@ -32,6 +67,10 @@ export function initRun(callbacks) {
   $('btn-simulate').addEventListener('click', simulate);
   $('btn-run-track-diagram').addEventListener('click', showTrackDiagram);
   $('btn-run-diagram-back').addEventListener('click', hideTrackDiagram);
+  $('run-diagram-filter-checkpoints').addEventListener('change', refreshTrackDiagram);
+  $('run-diagram-filter-lights').addEventListener('change', refreshTrackDiagram);
+  $('run-cursor-type').addEventListener('change', () => setCursorType(selectedCursorType()));
+  cursorType = selectedCursorType();
   sessionBests = [];
 }
 
@@ -68,12 +107,96 @@ export function openRun(r) {
 
 function showTrackDiagram() {
   if (!route || route.points.length < 2) return;
-  renderTrackDiagram($('run-track-diagram-svg'), route);
+  resetTrackDiagramFilters();
+  refreshTrackDiagram();
   $('run-track-diagram-overlay').hidden = false;
+  $('view-run').classList.add('diagram-mode');
 }
 
 function hideTrackDiagram() {
   $('run-track-diagram-overlay').hidden = true;
+  $('view-run').classList.remove('diagram-mode');
+}
+
+function resetTrackDiagramFilters() {
+  $('run-diagram-filter-checkpoints').checked = true;
+  $('run-diagram-filter-lights').checked = false;
+}
+
+function refreshTrackDiagram() {
+  if (!route || route.points.length < 2) return;
+  renderTrackDiagram($('run-track-diagram-svg'), route, {
+    showSectorCheckpoints: $('run-diagram-filter-checkpoints').checked,
+    showLights: $('run-diagram-filter-lights').checked,
+  });
+}
+
+function selectedCursorType() {
+  const value = $('run-cursor-type')?.value ?? 'dot';
+  return CURSOR_TYPES.has(value) ? value : 'dot';
+}
+
+function setCursorType(type) {
+  cursorType = CURSOR_TYPES.has(type) ? type : 'dot';
+  if (!posMarker || !cursorLatLng) return;
+  posMarker.remove();
+  posMarker = null;
+  drawCursor(cursorLatLng, cursorHeading);
+}
+
+function showCursor(latLng) {
+  const nextHeading = cursorLatLng && haversine(cursorLatLng, latLng) >= CURSOR_TURN_THRESHOLD_M ?
+    bearing(cursorLatLng, latLng) : cursorHeading;
+  cursorLatLng = latLng;
+  cursorHeading = nextHeading;
+  if (selectedCursorType() !== cursorType) setCursorType(selectedCursorType());
+  drawCursor(latLng, nextHeading);
+}
+
+function drawCursor(latLng, heading) {
+  if (!posMarker) {
+    posMarker = createCursorMarker(latLng, heading);
+  } else {
+    posMarker.setLatLng(latLng);
+    updateCursorHeading(heading);
+  }
+}
+
+function createCursorMarker(latLng, heading) {
+  if (cursorType === 'dot') {
+    return L.circleMarker(latLng,
+      { radius: 8, color: '#00c853', fillColor: '#00c853', fillOpacity: 0.9 }).addTo(map);
+  }
+  return L.marker(latLng, {
+    interactive: false,
+    keyboard: false,
+    icon: L.divIcon({
+      className: 'run-cursor-icon',
+      html: vehicleHtml(cursorType, heading),
+      iconSize: [48, 48],
+      iconAnchor: [24, 24],
+    }),
+  }).addTo(map);
+}
+
+function updateCursorHeading(heading) {
+  posMarker?.getElement?.()
+    ?.querySelector('.run-cursor-model')
+    ?.style.setProperty('--heading', `${heading}deg`);
+}
+
+function vehicleHtml(type, heading) {
+  return `<div class="run-cursor-model run-cursor-${type}" style="--heading:${heading}deg">${VEHICLE_MODELS[type]}</div>`;
+}
+
+function bearing(from, to) {
+  const lat1 = from[0] * Math.PI / 180;
+  const lat2 = to[0] * Math.PI / 180;
+  const dLng = (to[1] - from[1]) * Math.PI / 180;
+  const y = Math.sin(dLng) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) -
+    Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 }
 
 // ---------- GPS session ----------
@@ -146,12 +269,7 @@ function handleFix(fix) {
   if (!run) return;
   const ev = feedFix(run, fix);
 
-  if (!posMarker) {
-    posMarker = L.circleMarker([fix.lat, fix.lng],
-      { radius: 8, color: '#00c853', fillOpacity: 0.9 }).addTo(map);
-  } else {
-    posMarker.setLatLng([fix.lat, fix.lng]);
-  }
+  showCursor([fix.lat, fix.lng]);
 
   if (ev === 'start') setStatus('LIVE — lap running.', 'live');
   if (ev === 'offroute') setStatus('LIVE — off route? Timing continues at last position.', 'armed');
@@ -194,6 +312,7 @@ function stopSession(statusMsg, keepBoard = false) {
   if (!keepBoard) {
     run = null;
     if (posMarker) { posMarker.remove(); posMarker = null; }
+    cursorLatLng = null;
     $('run-clock').textContent = fmtTime(null);
   }
   $('btn-arm').disabled = false;

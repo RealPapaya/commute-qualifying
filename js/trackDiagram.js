@@ -111,11 +111,14 @@ function startFinishTick(points, project, atIdx, dirIdx, label) {
 // Build the stylized circuit SVG for `route` into `container` (a plain DOM
 // element). Re-derives everything from route.points/sectorBoundaries/lights
 // each call — cheap, no incremental state to keep in sync.
-export function renderTrackDiagram(container, route) {
+export function renderTrackDiagram(container, route, options = {}) {
   container.innerHTML = '';
   const points = route?.points || [];
   if (points.length < 2) return;
+  const { showLights = false, showSectorCheckpoints = true } = options;
 
+  const cum = cumulativeDistances(points);
+  const total = cum.at(-1);
   const { viewBox, project } = computeProjection(points);
   const svg = el('svg', { viewBox: viewBox.join(' '), preserveAspectRatio: 'xMidYMid meet' });
 
@@ -145,16 +148,39 @@ export function renderTrackDiagram(container, route) {
     svg.appendChild(startFinishTick(points, project, points.length - 1, points.length - 2, 'FINISH'));
   }
 
-  // traffic light dots
-  (route.lights || []).forEach(p => {
-    const [x, y] = project(p);
-    svg.appendChild(el('circle', {
-      cx: x, cy: y, r: 6, fill: '#ffd600', stroke: '#000', 'stroke-width': 1.5,
-    }));
-  });
+  if (showSectorCheckpoints) {
+    const checkpoints = [...(route.sectorBoundaries || [])]
+      .filter(d => d > 0 && d < total)
+      .sort((a, b) => a - b);
+    checkpoints.forEach((d, i) => {
+      const [x, y] = project(pointAtDistance(points, cum, d));
+      const g = el('g', { class: 'track-checkpoint' });
+      g.appendChild(el('circle', {
+        cx: x, cy: y, r: 9, fill: '#ffd600', stroke: '#000', 'stroke-width': 2,
+      }));
+      g.appendChild(el('circle', {
+        cx: x, cy: y, r: 3.5, fill: '#111', stroke: '#fff', 'stroke-width': 1,
+      }));
+      const label = el('text', {
+        x: x + 12, y: y - 10, class: 'track-label-checkpoint',
+      });
+      label.textContent = `CP${i + 1}`;
+      g.appendChild(label);
+      svg.appendChild(g);
+    });
+  }
+
+  if (showLights) {
+    (route.lights || []).forEach(p => {
+      const [x, y] = project(p);
+      svg.appendChild(el('circle', {
+        cx: x, cy: y, r: 6, class: 'track-light-dot', fill: '#ffd600', stroke: '#000', 'stroke-width': 1.5,
+      }));
+    });
+  }
 
   // name + total distance, matching the editor's existing stats format
-  const km = (cumulativeDistances(points).at(-1) / 1000).toFixed(2);
+  const km = (total / 1000).toFixed(2);
   const nameText = el('text', { x: 24, y: 40, class: 'track-label-name' });
   nameText.textContent = route.name || 'Unnamed route';
   svg.appendChild(nameText);
