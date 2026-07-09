@@ -186,7 +186,14 @@ export function renderTrackDiagram(container, route, options = {}) {
 
   const cum = cumulativeDistances(points);
   const total = cum.at(-1);
-  const { viewBox, project } = computeProjection(points);
+  // Shape the viewBox like the container. With a fixed 1000x700 box, a phone's
+  // tall viewport letterboxes the track into a thin horizontal band. Area is
+  // held roughly constant so the hard-coded stroke widths keep their weight.
+  const rect = container.getBoundingClientRect?.();
+  const aspect = rect?.width > 0 && rect?.height > 0 ? rect.width / rect.height : VIEW_W / VIEW_H;
+  const height = Math.round(Math.sqrt((VIEW_W * VIEW_H) / aspect));
+  const width = Math.round(height * aspect);
+  const { viewBox, project } = computeProjection(points, { width, height, pad: VIEW_PAD });
   const svg = el('svg', { viewBox: viewBox.join(' '), preserveAspectRatio: 'xMidYMid meet' });
 
   // dark casing: one continuous stroke under everything, so sector-color

@@ -3,11 +3,13 @@ import { listRoutes, getRoute, deleteRoute, listRuns, deleteRun,
          allTimeBests } from './store.js';
 import { initEditor, openRoute, editorInvalidate } from './routeBuilder.js';
 import { initRun, openRun, runInvalidate } from './run.js';
+import { showSummary } from './summary.js';
 import { fmtTime } from './timing.js';
 import { cumulativeDistances } from './geo.js';
 
 const $ = id => document.getElementById(id);
 let activeRouteId = null;
+let lastSummaryRunId = null;
 let runLoadedKey = null;    // routeId:timingVersion currently loaded in the run view
 let editorLoadedId = null;  // routeId currently loaded in the editor
 
@@ -19,7 +21,7 @@ function showView(name) {
   if (name === 'editor') { ensureEditorLoaded(); editorInvalidate(); }
   if (name === 'run') { ensureRunLoaded(); runInvalidate(); }
   if (name === 'routes') renderRouteList();
-  if (name === 'history') renderHistory();
+  if (name === 'history') { renderHistory(); showLastSummary(); }
 }
 
 // The editor must always show the active route; reloading discards unsaved
@@ -137,21 +139,43 @@ function renderHistory() {
     const route = routes.find(r => r.id === run.routeId);
     const d = new Date(run.date);
     const sectors = run.sectorTimes.map((t, i) => `S${i + 1} ${fmtTime(t)}`).join(' · ');
+    const summaryButton = route
+      ? `<button class="btn primary" data-summaryrun="${run.id}">Summary</button>`
+      : '';
     return `<li>
       <div>
         <div>${esc(route?.name ?? '(deleted route)')} — <strong>${fmtTime(run.totalTime)}</strong>
           ${run.simulated ? '<span class="meta">(sim)</span>' : ''}</div>
         <div class="meta">${d.toLocaleString()} · ${sectors}</div>
       </div>
-      <button class="btn danger" data-delrun="${run.id}">✕</button>
+      <div class="actions">
+        ${summaryButton}
+        <button class="btn danger" data-delrun="${run.id}">✕</button>
+      </div>
     </li>`;
   }).join('');
+
+  $('run-history').querySelectorAll('[data-summaryrun]').forEach(b =>
+    b.addEventListener('click', () => showRunSummary(b.dataset.summaryrun)));
 
   $('run-history').querySelectorAll('[data-delrun]').forEach(b =>
     b.addEventListener('click', () => {
       deleteRun(b.dataset.delrun);
       renderHistory();
     }));
+}
+
+function showLastSummary() {
+  if (!lastSummaryRunId || !$('summary-overlay')?.hidden) return;
+  if (!showRunSummary(lastSummaryRunId)) lastSummaryRunId = null;
+}
+
+function showRunSummary(runId) {
+  const run = listRuns().find(r => r.id === runId);
+  const route = run ? getRoute(run.routeId) : null;
+  if (!run || !route) return false;
+  showSummary(route, run, listRuns(route.id));
+  return true;
 }
 
 function esc(s) {
@@ -168,7 +192,10 @@ initEditor({
   },
 });
 initRun({
-  onRunSaved() { /* history re-renders on tab open */ },
+  onRunSaved(record) {
+    lastSummaryRunId = record.id;
+    /* history re-renders on tab open */
+  },
   onReplanRoute(routeId) {
     activeRouteId = routeId;
     editorLoadedId = null;

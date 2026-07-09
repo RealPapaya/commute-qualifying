@@ -15,14 +15,37 @@
 </head>
 <body>
   <header id="topbar">
-    <h1>COMMUTE<span>QUALIFYING</span></h1>
-    <nav id="tabs">
-      <button data-view="routes" class="tab active">Routes</button>
-      <button data-view="editor" class="tab" disabled>Editor</button>
-      <button data-view="run" class="tab" disabled>Run</button>
-      <button data-view="history" class="tab">History</button>
-    </nav>
+    <h1><span class="eyebrow">COMMUTE</span><span class="title">QUALIFYING</span></h1>
   </header>
+
+  <!-- Bottom nav. Icon-only, as in the reference; the accessible name carries
+       the label. app.js keys off data-view, never the text. -->
+  <nav id="tabs">
+    <button data-view="routes" class="tab active" aria-label="Routes" title="Routes">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M7 21V4"/><path d="M7 5h10l-3 3.5L17 12H7z"/>
+      </svg>
+    </button>
+    <button data-view="editor" class="tab" disabled aria-label="Editor" title="Editor">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4.5 19.5h3.2L19 8.2a2.2 2.2 0 0 0-3.2-3.2L4.5 16.3z"/><path d="M15 6l3 3"/>
+      </svg>
+    </button>
+    <button data-view="run" class="tab" disabled aria-label="Run" title="Run">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3.6 15a8.4 8.4 0 0 1 16.8 0"/>
+        <path d="M3.6 15h16.8v1.6a1.6 1.6 0 0 1-1.6 1.6H5.2a1.6 1.6 0 0 1-1.6-1.6z"/>
+        <path d="M9.6 15a5.4 5.4 0 0 1 4.9-5.4"/>
+      </svg>
+    </button>
+    <button data-view="history" class="tab" aria-label="History" title="History">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M7.2 4h9.6v4.6a4.8 4.8 0 0 1-9.6 0z"/>
+        <path d="M7.2 5.6H5a2.2 2.2 0 0 0 2.4 4"/><path d="M16.8 5.6H19a2.2 2.2 0 0 1-2.4 4"/>
+        <path d="M12 13.4V16"/><path d="M8.6 20h6.8"/><path d="M9.6 20a2.4 2.4 0 0 1 4.8 0"/>
+      </svg>
+    </button>
+  </nav>
 
   <!-- Routes list -->
   <section id="view-routes" class="view active">

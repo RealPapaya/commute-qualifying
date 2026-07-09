@@ -274,9 +274,11 @@ function refreshStats() {
 function showTrackDiagram() {
   if (!route || route.points.length < 2) return;
   resetTrackDiagramFilters();
-  refreshTrackDiagram();
+  // Unhide first: the diagram sizes its viewBox from the container, which has
+  // no box while [hidden].
   document.getElementById('track-diagram-overlay').hidden = false;
   document.getElementById('view-editor').classList.add('diagram-mode');
+  refreshTrackDiagram();
 }
 
 function hideTrackDiagram() {

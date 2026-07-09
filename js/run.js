@@ -140,13 +140,16 @@ function setMapMode(mode, { resetFilters = false } = {}) {
   const picker = $('run-map-mode');
   if (picker && picker.value !== mapMode) picker.value = mapMode;
 
+  // Unhide before rendering: the diagram sizes its viewBox from the container,
+  // which has no box while [hidden].
+  $('run-track-diagram-overlay').hidden = mapMode !== 'track';
+  $('view-run').classList.toggle('diagram-mode', mapMode === 'track');
+
   if (mapMode === 'track') {
     if (resetFilters) resetTrackDiagramFilters();
     refreshTrackDiagram();
   }
 
-  $('run-track-diagram-overlay').hidden = mapMode !== 'track';
-  $('view-run').classList.toggle('diagram-mode', mapMode === 'track');
   if (mapMode === 'street') setTimeout(() => map?.invalidateSize(), 0);
 }
 

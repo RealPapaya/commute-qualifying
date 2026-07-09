@@ -4,6 +4,7 @@ import { chromium } from 'playwright';
 
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 const page = await browser.newPage({ viewport: { width: 480, height: 900 } });
+await page.route('**/favicon.ico', route => route.fulfill({ status: 204, body: '' }));
 const errors = [];
 page.on('pageerror', e => errors.push(String(e)));
 page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
@@ -66,6 +67,16 @@ await page.locator('#summary-overlay').screenshot({ path: 'test/shots/10-summary
 await page.click('.f1c-close');
 await page.waitForSelector('#summary-overlay', { state: 'hidden', timeout: 4000 });
 console.log('close: ok');
+
+await page.click('[data-view="history"]');
+await page.waitForSelector('#summary-overlay .f1c-card', { timeout: 4000 });
+console.log('history tab summary: ok');
+
+await page.click('.f1c-close');
+await page.waitForSelector('#summary-overlay', { state: 'hidden', timeout: 4000 });
+await page.click('#run-history [data-summaryrun]');
+await page.waitForSelector('#summary-overlay .f1c-card', { timeout: 4000 });
+console.log('history button summary: ok');
 
 console.log('pageerrors:', errors.length ? errors : 'none');
 await browser.close();

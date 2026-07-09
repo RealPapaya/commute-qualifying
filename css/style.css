@@ -1,21 +1,42 @@
+/* ---------------------------------------------------------------------------
+   App shell.
+   Visual language is shared with the post-run summary card at the bottom of
+   this file: Archivo, a white surface on #2d2d2d, and the same black bar.
+   Sector timing keeps the F1 colour semantics (purple = session best,
+   green = personal best, yellow = slower) — those are meaning, not decoration.
+   --------------------------------------------------------------------------- */
+
 :root {
-  --bg: #07080c;
-  --panel: rgba(14, 16, 22, 0.94);
-  --panel2: #171a22;
-  --panel3: #20242f;
-  --text: #f7f7fb;
-  --dim: #9aa1af;
-  --muted: #5f6877;
+  --bg: #2d2d2d;
+  --surface: #fff;
+  --surface2: #f4f4f4;
+  --panel: #fff;
+  --panel2: #f4f4f4;
+  --panel3: #dedede;
+  --bar: #020202;
+  --text: #15151e;
+  --dim: #6e6e77;
+  --muted: #9a9aa2;
   --accent: #ff2d2d;
-  --accent2: #ff6a3d;
-  --purple: #c45cff;
-  --green: #2ee66b;
-  --yellow: #ffd23f;
-  --border: rgba(255, 255, 255, 0.1);
-  --hairline: rgba(255, 255, 255, 0.07);
+  --accent2: #e10600;
+  --purple: #8b2ee6;
+  --green: #12a53f;
+  --yellow: #c58a00;
+  --purple-vivid: #c45cff;
+  --green-vivid: #2ee66b;
+  --yellow-vivid: #ffd23f;
+  --border: rgba(0, 0, 0, 0.12);
+  --hairline: rgba(0, 0, 0, 0.08);
   --shadow: 0 18px 50px rgba(0, 0, 0, 0.42);
-  --nav-height: 70px;
+  --nav-height: 66px;
   --radius: 8px;
+  --radius-lg: 14px;
+  /* Archivo stands in for the proprietary Formula1 Display; the wdth axis is
+     what makes it read as the same wide face. */
+  --w-num: 120;
+  --w-title: 120;
+  --w-label: 100;
+  --w-eyebrow: 96;
 }
 
 * {
@@ -29,90 +50,150 @@ html {
 }
 
 body {
-  background:
-    linear-gradient(180deg, rgba(255, 45, 45, 0.08), rgba(7, 8, 12, 0) 30%),
-    var(--bg);
+  background: var(--bg);
   color: var(--text);
-  font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Archivo', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   height: 100dvh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   letter-spacing: 0;
+  -webkit-font-smoothing: antialiased;
 }
 
+/* Slashed zero, as on the summary card. */
+.f1-zero {
+  position: relative;
+  display: inline-block;
+}
+
+.f1-zero::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 12%;
+  bottom: 12%;
+  width: .085em;
+  margin-left: -.0425em;
+  background: currentColor;
+  transform: rotate(19deg);
+}
+
+/* --- top bar: eyebrow over a wide, heavy title --- */
+
 #topbar {
-  min-height: 64px;
+  position: relative;
+  min-height: 68px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 12px;
-  padding: 12px 16px;
-  background: rgba(7, 8, 12, 0.92);
-  border-bottom: 1px solid var(--hairline);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.24);
-  backdrop-filter: blur(18px);
+  padding: 14px 16px 12px;
+  background: var(--bg);
   z-index: 3000;
 }
 
 #topbar h1 {
-  color: var(--text);
-  font-size: 15px;
-  font-style: normal;
-  font-weight: 800;
-  letter-spacing: 1.8px;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  color: #fff;
   line-height: 1;
 }
 
-#topbar h1::before {
-  content: "DRIVE MODE";
-  display: block;
-  margin-bottom: 5px;
-  color: var(--accent2);
+#topbar h1 .eyebrow {
+  color: rgba(255, 255, 255, 0.62);
   font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 1.4px;
+  font-weight: 700;
+  font-variation-settings: 'wdth' var(--w-eyebrow);
+  letter-spacing: 1.5px;
 }
 
-#topbar h1 span {
-  color: var(--text);
-  margin-left: 4px;
+#topbar h1 .title {
+  font-size: 21px;
+  font-weight: 800;
+  font-variation-settings: 'wdth' var(--w-title);
+  letter-spacing: -0.2px;
 }
+
+/* --- bottom nav (traced off the reference: black pill, hairline dividers,
+       white underline on the active cell) --- */
 
 #tabs {
-  display: flex;
-  gap: 6px;
-  padding: 5px;
-  background: rgba(18, 20, 28, 0.82);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(20px);
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(10px + env(safe-area-inset-bottom));
+  /* Below .summary-overlay (6000) so the finish card is never split by it. */
+  z-index: 5000;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  background: var(--bar);
+  border: 0;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
 }
 
 .tab {
-  min-height: 40px;
+  position: relative;
+  min-height: 54px;
+  display: grid;
+  place-items: center;
   border: 0;
-  border-radius: var(--radius);
+  border-radius: 0;
   background: none;
-  color: var(--dim);
-  padding: 0 13px;
+  color: rgba(255, 255, 255, 0.72);
+  padding: 0;
   cursor: pointer;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.7px;
-  text-transform: uppercase;
+  font-size: 0;
+  letter-spacing: 0;
+}
+
+/* hairline divider between cells */
+.tab + .tab::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 28%;
+  bottom: 28%;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.tab svg {
+  width: 22px;
+  height: 22px;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .tab.active {
-  color: #090a0f;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: none;
+}
+
+/* the underline on the active cell */
+.tab.active::after {
+  content: "";
+  position: absolute;
+  left: 22%;
+  right: 22%;
+  bottom: 6px;
+  height: 2px;
+  border-radius: 2px;
   background: #fff;
-  border-color: transparent;
-  box-shadow: 0 8px 18px rgba(255, 255, 255, 0.16);
 }
 
 .tab:disabled {
-  opacity: 0.34;
+  opacity: 0.32;
   cursor: default;
 }
 
@@ -132,9 +213,7 @@ body {
   position: relative;
   flex: 1;
   min-height: 0;
-  background:
-    linear-gradient(135deg, rgba(255, 45, 45, 0.14), rgba(46, 230, 107, 0.05)),
-    #090b10;
+  background: #cfd3d6;
 }
 
 .map::after {
@@ -142,12 +221,15 @@ body {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  box-shadow: inset 0 -70px 70px rgba(7, 8, 12, 0.34);
+  box-shadow: inset 0 -60px 60px rgba(45, 45, 45, 0.28);
   z-index: 400;
 }
 
+/* --- surfaces --- */
+
 .panel {
   background: var(--panel);
+  color: var(--text);
   border-color: var(--hairline);
   padding: 14px;
   overflow-y: auto;
@@ -156,10 +238,10 @@ body {
 #view-routes .panel,
 #view-history .panel {
   flex: 1;
-  padding: 22px 16px calc(var(--nav-height) + 22px + env(safe-area-inset-bottom));
-  background:
-    linear-gradient(180deg, rgba(255, 45, 45, 0.1), rgba(255, 255, 255, 0.02) 160px),
-    var(--bg);
+  margin: 0 12px 0;
+  padding: 20px 16px calc(var(--nav-height) + 26px + env(safe-area-inset-bottom));
+  background: var(--surface);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
 
 .panel-head {
@@ -172,27 +254,33 @@ body {
 
 .panel-head h2 {
   color: var(--text);
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 800;
-  letter-spacing: 0.2px;
+  font-variation-settings: 'wdth' 100;
+  letter-spacing: -0.1px;
   text-transform: none;
 }
+
+/* --- buttons --- */
 
 .btn {
   min-height: 44px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.065);
+  background: var(--surface2);
   color: var(--text);
   padding: 8px 12px;
   cursor: pointer;
-  font-size: 13px;
-  font-weight: 750;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  font-variation-settings: 'wdth' var(--w-label);
+  letter-spacing: 0.3px;
   transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
 }
 
 .btn:hover {
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: rgba(0, 0, 0, 0.28);
 }
 
 .btn:active {
@@ -200,28 +288,28 @@ body {
 }
 
 .btn.primary {
-  background: linear-gradient(135deg, var(--accent), #c90000);
-  border-color: rgba(255, 94, 94, 0.55);
+  background: var(--bar);
+  border-color: var(--bar);
   color: #fff;
   font-weight: 800;
-  box-shadow: 0 12px 28px rgba(225, 6, 0, 0.28);
+  box-shadow: none;
 }
 
 .btn.danger {
-  background: rgba(255, 77, 77, 0.08);
-  border-color: rgba(255, 77, 77, 0.22);
-  color: #ff8178;
+  background: #fff;
+  border-color: rgba(225, 6, 0, 0.4);
+  color: var(--accent2);
 }
 
 .btn.big {
   min-height: 58px;
   padding: 12px 24px;
-  font-size: 15px;
-  letter-spacing: 0.7px;
+  font-size: 14px;
+  letter-spacing: 1px;
 }
 
 .btn:disabled {
-  opacity: 0.4;
+  opacity: 0.36;
   cursor: default;
 }
 
@@ -243,7 +331,7 @@ body {
 }
 
 .toggle input {
-  accent-color: var(--accent);
+  accent-color: var(--bar);
 }
 
 .hint {
@@ -258,8 +346,9 @@ body {
   min-height: 46px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--surface2);
   color: var(--text);
+  font-family: inherit;
   outline: none;
 }
 
@@ -272,19 +361,21 @@ body {
 
 .name-input:focus,
 .run-picker select:focus {
-  border-color: rgba(255, 45, 45, 0.7);
-  box-shadow: 0 0 0 3px rgba(255, 45, 45, 0.14);
+  border-color: var(--bar);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
 }
 
 .stats {
   padding: 9px 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.055);
+  background: var(--surface2);
   color: var(--dim);
   font-size: 12px;
   white-space: nowrap;
 }
+
+/* --- lists --- */
 
 .route-list,
 .run-list {
@@ -301,12 +392,10 @@ body {
   gap: 10px;
   margin: 0;
   padding: 14px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--hairline);
   border-radius: var(--radius);
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.095), rgba(255, 255, 255, 0.035)),
-    var(--panel2);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.2);
+  background: var(--surface2);
+  box-shadow: none;
 }
 
 .route-list li > div:first-child,
@@ -321,6 +410,7 @@ body {
   color: var(--text);
   font-size: 15px;
   font-weight: 800;
+  font-variation-settings: 'wdth' 105;
   line-height: 1.25;
 }
 
@@ -331,7 +421,8 @@ body {
   line-height: 1.35;
 }
 
-.route-list .actions {
+.route-list .actions,
+.run-list .actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
@@ -342,15 +433,18 @@ body {
   grid-column: 1 / -1;
 }
 
+/* --- editor / run bottom sheets --- */
+
 .editor-panel,
 .run-panel {
   position: relative;
   z-index: 2101;
   max-height: 46dvh;
-  border-top: 1px solid var(--hairline);
-  background: rgba(14, 16, 22, 0.94);
+  border-top: 0;
+  background: var(--surface);
+  color: var(--text);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   box-shadow: 0 -18px 42px rgba(0, 0, 0, 0.32);
-  backdrop-filter: blur(18px);
 }
 
 .editor-panel::before,
@@ -361,7 +455,7 @@ body {
   height: 4px;
   margin: 0 auto 12px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.28);
+  background: rgba(0, 0, 0, 0.2);
 }
 
 #editor-toolbar {
@@ -371,7 +465,7 @@ body {
   padding: 4px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.055);
+  background: var(--surface2);
 }
 
 #editor-toolbar .btn.tool {
@@ -384,10 +478,10 @@ body {
 }
 
 #editor-toolbar .btn.tool.active {
-  background: #fff;
-  color: #090a0f;
+  background: var(--bar);
+  color: #fff;
   border-color: transparent;
-  box-shadow: 0 9px 18px rgba(0, 0, 0, 0.22);
+  box-shadow: none;
 }
 
 #editor-toolbar .toggle {
@@ -425,17 +519,22 @@ body {
   padding: 2px 8px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.055);
+  background: var(--surface2);
   color: var(--text);
 }
+
+/* --- run --- */
 
 .run-status {
   margin-bottom: 10px;
   color: var(--dim);
-  font-size: 12px;
-  font-weight: 750;
+  font-size: 11px;
+  font-weight: 700;
+  font-variation-settings: 'wdth' var(--w-label);
+  letter-spacing: 0.4px;
   line-height: 1.35;
   text-align: center;
+  text-transform: uppercase;
 }
 
 .run-status.live {
@@ -450,10 +549,10 @@ body {
 .offroute-flag {
   margin: 0 0 10px;
   padding: 10px;
-  border: 1px solid rgba(255, 210, 63, 0.45);
+  border: 1px solid rgba(197, 138, 0, 0.45);
   border-radius: var(--radius);
-  background: rgba(255, 210, 63, 0.1);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.22);
+  background: rgba(255, 210, 63, 0.16);
+  box-shadow: none;
 }
 
 .offroute-title {
@@ -474,23 +573,22 @@ body {
   margin-bottom: 0;
 }
 
+/* The hero clock echoes the card's .f1c-mytime: heavy, wide, tight-tracked. */
 .run-clock {
   margin: 4px 0 12px;
-  padding: 16px 10px 14px;
-  border: 1px solid var(--border);
+  padding: 14px 10px 12px;
+  border: 0;
   border-radius: var(--radius);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.035)),
-    #0b0d12;
-  color: #fff;
-  font-family: Consolas, "Roboto Mono", monospace;
-  font-size: clamp(42px, 14vw, 64px);
+  background: var(--panel3);
+  color: var(--text);
+  font-family: 'Archivo', system-ui, sans-serif;
+  font-size: clamp(40px, 13vw, 60px);
   font-weight: 800;
+  font-variation-settings: 'wdth' 108;
   line-height: 1;
-  letter-spacing: 0.5px;
+  letter-spacing: -0.015em;
   text-align: center;
-  font-variant-numeric: tabular-nums;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 16px 34px rgba(0, 0, 0, 0.22);
+  box-shadow: none;
 }
 
 .run-options {
@@ -504,8 +602,10 @@ body {
   display: grid;
   gap: 5px;
   color: var(--dim);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
+  font-variation-settings: 'wdth' var(--w-label);
+  letter-spacing: 0.6px;
   text-transform: uppercase;
 }
 
@@ -513,7 +613,10 @@ body {
   width: 100%;
   min-width: 0;
   padding: 0 10px;
+  font-size: 13px;
+  font-weight: 600;
   text-transform: none;
+  letter-spacing: 0;
 }
 
 .run-panel > .toolbar {
@@ -549,6 +652,11 @@ body {
   height: 48px;
 }
 
+/* --- sector board.
+   Purple / green / yellow are F1 timing semantics and are deliberately kept.
+   The vivid tokens are for the dark track-diagram surface; the darker ones
+   above carry the same hue at a contrast that survives on white. --- */
+
 .sector-board {
   display: flex;
   flex-direction: column;
@@ -566,9 +674,10 @@ body {
   border: 1px solid var(--hairline);
   border-left: 4px solid var(--border);
   border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.055);
-  font-family: Consolas, "Roboto Mono", monospace;
+  background: var(--surface2);
+  font-family: 'Archivo', system-ui, sans-serif;
   font-size: 13px;
+  font-variation-settings: 'wdth' 100;
   font-variant-numeric: tabular-nums;
 }
 
@@ -576,6 +685,7 @@ body {
   color: var(--text);
   font-size: 11px;
   font-weight: 800;
+  letter-spacing: 0.4px;
 }
 
 .sector-row .best {
@@ -594,10 +704,11 @@ body {
 .sector-row .delta {
   text-align: right;
   font-size: 12px;
+  font-weight: 700;
 }
 
 .sector-row.pending {
-  opacity: 0.55;
+  opacity: 0.5;
 }
 
 .sector-row.current {
@@ -647,44 +758,50 @@ body {
 }
 
 #best-board .best-cell {
-  border: 1px solid rgba(196, 92, 255, 0.3);
+  border: 1px solid rgba(139, 46, 230, 0.24);
   border-radius: var(--radius);
-  background: rgba(196, 92, 255, 0.08);
+  background: rgba(139, 46, 230, 0.07);
   padding: 8px;
   text-align: center;
 }
 
 #best-board .best-cell .v {
   color: var(--purple);
-  font-family: Consolas, monospace;
-  font-size: 16px;
+  font-family: 'Archivo', system-ui, sans-serif;
+  font-size: 17px;
   font-weight: 800;
+  font-variation-settings: 'wdth' 108;
+  font-variant-numeric: tabular-nums;
 }
 
 #best-board .best-cell .k {
   color: var(--dim);
-  font-size: 11px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
   text-transform: uppercase;
 }
 
+/* --- leaflet --- */
+
 .leaflet-container {
-  background: #090b10;
+  background: #cfd3d6;
+  font-family: 'Archivo', system-ui, sans-serif;
 }
 
 .leaflet-control-attribution {
-  background: rgba(0, 0, 0, 0.6) !important;
-  color: #999 !important;
+  background: rgba(255, 255, 255, 0.78) !important;
+  color: #555 !important;
 }
 
 .leaflet-control-attribution a {
-  color: #bbb !important;
+  color: #333 !important;
 }
 
 .leaflet-control-zoom a {
-  background: rgba(15, 17, 23, 0.88) !important;
+  background: rgba(255, 255, 255, 0.92) !important;
   border-color: var(--border) !important;
   color: var(--text) !important;
-  backdrop-filter: blur(10px);
 }
 
 .wp-marker {
@@ -702,7 +819,7 @@ body {
   height: 18px !important;
   border: 2px solid rgba(0, 0, 0, 0.7);
   border-radius: 50%;
-  background: var(--yellow);
+  background: var(--yellow-vivid);
   color: transparent;
   font-size: 0;
   box-shadow: 0 0 0 5px rgba(255, 210, 63, 0.2), 0 5px 12px rgba(0, 0, 0, 0.45);
@@ -711,7 +828,7 @@ body {
 .sector-handle {
   border: 2px solid #111;
   border-radius: var(--radius);
-  background: var(--yellow);
+  background: var(--yellow-vivid);
   cursor: grab;
   box-shadow: 0 0 0 5px rgba(255, 210, 63, 0.16);
 }
@@ -721,11 +838,16 @@ body {
   position: relative;
 }
 
+/* --- track diagram: grey gradient, white racing line, red accents --- */
+
 .track-diagram-overlay {
   position: absolute;
   inset: 0;
-  z-index: 2000;
-  background: var(--bg);
+  /* Must clear .editor-panel / .run-panel (2101), or on the stacked mobile
+     layout the panel paints over the diagram and hides its centred track.
+     Stays under #tabs (5000) and .summary-overlay (6000). */
+  z-index: 2200;
+  background: linear-gradient(180deg, #9a9c9b 0%, #6c7479 52%, #949da1 100%);
   flex-direction: column;
 }
 
@@ -738,17 +860,28 @@ body {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-  padding: 8px 14px;
-  border-bottom: 1px solid var(--hairline);
-  background: rgba(7, 8, 12, 0.94);
-  backdrop-filter: blur(18px);
+  padding: 10px 14px;
+  border-bottom: 0;
+  background: transparent;
+}
+
+.track-diagram-head .btn {
+  min-height: 38px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.42);
+  color: #15151e;
+  backdrop-filter: blur(6px);
 }
 
 .track-diagram-title {
+  color: #fff;
   font-size: 13px;
   font-weight: 800;
-  letter-spacing: 0.8px;
+  font-variation-settings: 'wdth' 105;
+  letter-spacing: 0.4px;
   text-transform: uppercase;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
 }
 
 .track-diagram-filters {
@@ -757,12 +890,23 @@ body {
   gap: 10px;
   flex-wrap: wrap;
   margin-left: auto;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(6px);
+}
+
+.track-diagram-filters .toggle {
+  color: #15151e;
+  font-weight: 700;
 }
 
 .track-diagram-svg {
   flex: 1;
   min-height: 0;
   display: flex;
+  /* keep the centred track clear of the floating nav */
+  padding-bottom: calc(var(--nav-height) + 12px + env(safe-area-inset-bottom));
 }
 
 .track-diagram-svg svg {
@@ -771,27 +915,28 @@ body {
 }
 
 .track-label-name {
-  fill: var(--text);
-  font: 600 20px "Segoe UI", system-ui, sans-serif;
+  fill: #fff;
+  font: 800 20px 'Archivo', system-ui, sans-serif;
+  font-variation-settings: 'wdth' 110;
 }
 
 .track-label-stats {
-  fill: var(--dim);
-  font: 12px "Segoe UI", system-ui, sans-serif;
+  fill: rgba(255, 255, 255, 0.82);
+  font: 600 12px 'Archivo', system-ui, sans-serif;
 }
 
 .track-label-tick {
-  fill: var(--text);
-  font: 11px "Segoe UI", system-ui, sans-serif;
+  fill: #fff;
+  font: 700 11px 'Archivo', system-ui, sans-serif;
   letter-spacing: 1px;
 }
 
 .track-label-checkpoint {
-  fill: var(--yellow);
-  stroke: #000;
+  fill: #fff;
+  stroke: rgba(0, 0, 0, 0.55);
   stroke-width: 3px;
   paint-order: stroke;
-  font: 700 12px "Segoe UI", system-ui, sans-serif;
+  font: 800 12px 'Archivo', system-ui, sans-serif;
   letter-spacing: 0.5px;
 }
 
@@ -806,28 +951,12 @@ body {
 
   #topbar {
     justify-content: center;
-    min-height: 58px;
-    padding: 10px 12px;
-    backdrop-filter: none;
+    min-height: 62px;
+    padding: 12px 12px 10px;
   }
 
-  #topbar h1 {
-    font-size: 13px;
-  }
-
-  #tabs {
-    position: fixed;
-    left: 12px;
-    right: 12px;
-    bottom: calc(10px + env(safe-area-inset-bottom));
-    z-index: 5000;
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .tab {
-    min-width: 0;
-    padding: 0 6px;
+  #topbar h1 .title {
+    font-size: 19px;
   }
 
   #view-editor.active,
@@ -846,7 +975,6 @@ body {
     flex: 0 0 auto;
     max-height: calc(100dvh - 64px - var(--nav-height) - 32dvh - env(safe-area-inset-bottom));
     padding: 12px 14px 16px;
-    border-radius: var(--radius) var(--radius) 0 0;
     overflow-y: auto;
   }
 
@@ -863,7 +991,8 @@ body {
     flex-direction: column;
   }
 
-  .route-list .actions {
+  .route-list .actions,
+  .run-list .actions {
     grid-template-columns: 1fr 1fr;
   }
 
@@ -910,14 +1039,17 @@ body {
 
 @media (min-width: 900px) {
   #topbar {
-    min-height: 70px;
-    padding: 14px 22px;
+    min-height: 74px;
+    padding: 16px 22px 14px;
   }
 
+  /* The nav stays docked at the bottom on every size — it is the app's
+     identity element, not a mobile affordance. */
   #tabs {
-    position: static;
-    width: auto;
-    box-shadow: none;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: 420px;
   }
 
   #view-editor.active,
@@ -937,7 +1069,9 @@ body {
     max-height: none;
     border-top: none;
     border-left: 1px solid var(--hairline);
+    border-radius: 0;
     box-shadow: -18px 0 42px rgba(0, 0, 0, 0.2);
+    padding-bottom: calc(var(--nav-height) + 24px);
   }
 
   .editor-panel::before,
@@ -947,7 +1081,9 @@ body {
 
   #view-routes .panel,
   #view-history .panel {
-    padding: 28px 32px;
+    margin: 0 auto;
+    width: min(100%, 980px);
+    padding: 26px 28px calc(var(--nav-height) + 30px);
   }
 
   .route-list,
@@ -961,7 +1097,7 @@ body {
   }
 
   .run-clock {
-    font-size: 58px;
+    font-size: 54px;
   }
 }
 
