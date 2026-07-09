@@ -1,0 +1,123 @@
+// E2E driver: builds the 立德路(土城) → 莊泰路(泰山) route through the real UI,
+// customizes waypoints + sectors, runs two simulated laps, screenshots each stage.
+// Run: node test/e2e-drive.mjs  (server must be up on :8080)
+import { chromium } from 'playwright';
+import { mkdirSync } from 'node:fs';
+
+const SHOTS = process.argv[2] ?? 'test/shots';
+mkdirSync(SHOTS, { recursive: true });
+
+// street-level anchors (OSM has no house numbers for these addresses)
+const START = [24.9876, 121.4630];   // 立德路, 土城區
+const WP1 = [25.0080, 121.4520];   // via 板橋 corridor
+const WP2 = [25.0300, 121.4375];   // 莊泰路 south (新莊)
+const END = [25.0502, 121.4392];   // 莊泰路 north end (泰山) ~1132號
+
+const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const page = await browser.newPage({ viewport: { width: 1380, height: 900 } });
+const errors = [];
+page.on('pageerror', e => errors.push(String(e)));
+
+const shot = async name => {
+  await page.waitForTimeout(1500); // let tiles settle
+  await page.screenshot({ path: `${SHOTS}/${name}.png` });
+  console.log('shot:', name);
+};
+
+await page.goto('http://localhost:8080/');
+await page.evaluate(() => localStorage.clear());
+await page.reload();
+
+// ---- 1. new route, frame the map on the commute area ----
+await page.click('#btn-new-route');
+await page.fill('#route-name', '立德路115號 → 莊泰路1132號');
+await page.evaluate(([a, b]) => {
+  window._editorMap.fitBounds(L.latLngBounds([a, b]).pad(0.15));
+}, [START, END]);
+await page.waitForTimeout(2500);
+
+// click the map at a given latlng through the real mouse pipeline
+async function clickMap(latlng) {
+  const { x, y } = await page.evaluate(ll =>
+    window._editorMap.latLngToContainerPoint(ll), latlng);
+  const box = await page.locator('#editor-map').boundingBox();
+  await page.mouse.click(box.x + x, box.y + y);
+}
+const stats = () => page.locator('#route-stats').textContent();
+
+// trace waypoints; markers are redrawn only after the OSRM re-snap resolves,
+// so waiting for the marker count covers the async rebuild too
+const wps = [START, WP1, WP2, END];
+for (let i = 0; i < wps.length; i++) {
+  await clickMap(wps[i]);
+  await page.waitForFunction(n =>
+    document.querySelectorAll('.wp-marker').length === n, i + 1,
+    { timeout: 20000 });
+  console.log(`wp${i + 1}:`, await stats());
+}
+console.log('traced:', await stats());
+await shot('1-route-traced');
+
+// ---- 2. manual edit: drag the 2nd waypoint ~1 km east, route re-snaps ----
+const wpEl = page.locator('.wp-marker').nth(1);
+const wpBox = await wpEl.boundingBox();
+const before = await stats();
+await page.mouse.move(wpBox.x + 6, wpBox.y + 6);
+await page.mouse.down();
+await page.mouse.move(wpBox.x + 120, wpBox.y + 20, { steps: 12 });
+await page.mouse.up();
+await page.waitForFunction(prev =>
+  document.getElementById('route-stats').textContent !== prev, before,
+  { timeout: 20000 });
+console.log('after drag:', await stats());
+await shot('2-waypoint-dragged');
+
+// ---- 3. traffic lights near two intersections along the route ----
+await page.click('[data-tool="light"]');
+await clickMap([25.012, 121.4487]);
+await clickMap([25.0405, 121.4383]);
+await shot('3-traffic-lights');
+
+// ---- 4. sectors: 3 -> 4, then drag a boundary handle along the route ----
+await page.click('[data-tool="sector"]');
+await page.click('#btn-add-sector'); // now 4 sectors
+await page.waitForTimeout(500);
+const handle = page.locator('.sector-handle').nth(0);
+const hBox = await handle.boundingBox();
+await page.mouse.move(hBox.x + 7, hBox.y + 7);
+await page.mouse.down();
+await page.mouse.move(hBox.x - 30, hBox.y + 70, { steps: 10 });
+await page.mouse.up();
+await page.waitForTimeout(500);
+console.log('sectors:', await page.locator('#sector-summary').textContent());
+await shot('4-sectors-custom');
+
+// ---- 5. save, run view ----
+await page.click('#btn-save-route');
+await shot('5-route-saved');
+await page.click('#route-list [data-run]');
+await page.waitForTimeout(2500);
+await shot('6-run-armed-view');
+
+// ---- 6. simulated lap 1 (all-time bests should come out purple) ----
+async function simulateLap(tag) {
+  await page.click('#btn-simulate');
+  await page.waitForSelector('.sector-row.set-purple, .sector-row.set-green, .sector-row.set-yellow',
+    { timeout: 120000 });
+  await shot(`${tag}-mid`);
+  await page.waitForFunction(() =>
+    document.getElementById('run-status').textContent.startsWith('FINISHED'),
+    null, { timeout: 240000 });
+  console.log(tag, await page.locator('#run-status').textContent());
+  await shot(`${tag}-finish`);
+}
+await simulateLap('7-lap1');
+await simulateLap('8-lap2'); // vs PB: mix of purple/green/yellow
+
+// ---- 7. history ----
+await page.click('[data-view="history"]');
+await shot('9-history');
+
+console.log('pageerrors:', errors.length ? errors : 'none');
+await browser.close();
+process.exit(errors.length ? 1 : 0);

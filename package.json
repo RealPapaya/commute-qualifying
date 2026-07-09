@@ -1,0 +1,12 @@
+{
+  "name": "commute-qualifying",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/",
+    "start": "npx -y serve -l 8080 ."
+  },
+  "devDependencies": {
+    "playwright": "^1.61.1"
+  }
+}
