@@ -75,9 +75,16 @@
       <div class="toolbar">
         <button id="btn-arm" class="btn primary big">ARM GPS</button>
         <button id="btn-abort" class="btn danger" hidden>Abort</button>
+        <button id="btn-run-track-diagram" class="btn" disabled title="Show F1-style circuit diagram">賽道圖</button>
         <button id="btn-simulate" class="btn">▶ Simulate run</button>
       </div>
       <div id="gps-info" class="hint"></div>
+    </div>
+    <div id="run-track-diagram-overlay" class="track-diagram-overlay" hidden>
+      <div class="track-diagram-head">
+        <button id="btn-run-diagram-back" class="btn">返回 Run</button>
+      </div>
+      <div id="run-track-diagram-svg" class="track-diagram-svg"></div>
     </div>
   </section>
 

@@ -4,6 +4,7 @@ import { cumulativeDistances, pointAtDistance } from './geo.js';
 import { createRun, feedFix, elapsed, classifySector, fmtTime, fmtDelta,
          MAX_ACCURACY_M } from './timing.js';
 import { allTimeBests, saveRun, newId } from './store.js';
+import { renderTrackDiagram } from './trackDiagram.js';
 
 let map, routeLayer = null, posMarker = null;
 let route = null;          // active route (with points/cum attached)
@@ -29,12 +30,16 @@ export function initRun(callbacks) {
   $('btn-arm').addEventListener('click', armGps);
   $('btn-abort').addEventListener('click', () => stopSession('Aborted.'));
   $('btn-simulate').addEventListener('click', simulate);
+  $('btn-run-track-diagram').addEventListener('click', showTrackDiagram);
+  $('btn-run-diagram-back').addEventListener('click', hideTrackDiagram);
   sessionBests = [];
 }
 
 export function openRun(r) {
   stopSession();
   route = { ...r, cum: cumulativeDistances(r.points) };
+  hideTrackDiagram();
+  $('btn-run-track-diagram').disabled = route.points.length < 2;
   bests = allTimeBests(route.id, route.sectorBoundaries.length + 1, route.timingVersion);
   sessionBests = route.sectorBoundaries.map(() => null).concat([null]);
 
@@ -59,6 +64,16 @@ export function openRun(r) {
   setStatus('Press ARM, then drive. Timing starts when you cross the start line.', '');
   $('run-clock').textContent = fmtTime(null);
   renderBoard();
+}
+
+function showTrackDiagram() {
+  if (!route || route.points.length < 2) return;
+  renderTrackDiagram($('run-track-diagram-svg'), route);
+  $('run-track-diagram-overlay').hidden = false;
+}
+
+function hideTrackDiagram() {
+  $('run-track-diagram-overlay').hidden = true;
 }
 
 // ---------- GPS session ----------

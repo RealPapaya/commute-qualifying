@@ -218,7 +218,7 @@ body {
 }
 
 /* ---- Track diagram overlay (F1 circuit map) ---- */
-#view-editor { position: relative; }
+#view-editor, #view-run { position: relative; }
 .track-diagram-overlay {
   position: absolute;
   inset: 0;
