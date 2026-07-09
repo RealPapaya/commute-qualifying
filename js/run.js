@@ -25,6 +25,7 @@ let mapMode = 'street';
 let trackCursorDistance = null;
 let offRouteFlagActive = false;
 let offRoutePromptDismissed = false;
+let followUser = false;
 
 const $ = id => document.getElementById(id);
 const CURSOR_TYPES = new Set(['dot', 'car', 'racecar', 'motorcycle']);
@@ -34,6 +35,7 @@ const SIM_SPEEDUP = 10;
 const CLOCK_REFRESH_MS = 16;
 const BOARD_REFRESH_MS = 100;
 const CURSOR_TURN_THRESHOLD_M = 3;
+const FOLLOW_ZOOM = 18;
 const VEHICLE_MODELS = {
   car: `<svg viewBox="0 0 48 48" aria-hidden="true">
     <defs><linearGradient id="car-body" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6ee7ff"/><stop offset="0.55" stop-color="#1976d2"/><stop offset="1" stop-color="#063f82"/></linearGradient></defs>
@@ -80,6 +82,7 @@ export function initRun(callbacks) {
   $('btn-replan-route').addEventListener('click', replanRoute);
   $('btn-wait-track').addEventListener('click', waitForTrack);
   $('btn-simulate').addEventListener('click', simulate);
+  $('btn-follow-user').addEventListener('click', toggleFollowUser);
   $('run-map-mode').addEventListener('change', () => setMapMode(selectedMapMode(), { resetFilters: true }));
   $('btn-run-diagram-back').addEventListener('click', hideTrackDiagram);
   $('run-diagram-filter-sector-colors').addEventListener('change', refreshTrackDiagram);
@@ -145,6 +148,7 @@ function setMapMode(mode, { resetFilters = false } = {}) {
   $('run-track-diagram-overlay').hidden = mapMode !== 'track';
 
   if (mapMode === 'track') {
+    setFollowUser(false, { pan: false });
     if (resetFilters) resetTrackDiagramFilters();
     refreshTrackDiagram();
   }
@@ -188,6 +192,7 @@ function showCursor(latLng) {
   cursorHeading = nextHeading;
   if (selectedCursorType() !== cursorType) setCursorType(selectedCursorType());
   drawCursor(latLng, nextHeading);
+  followCurrentPosition(latLng);
 }
 
 function drawCursor(latLng, heading) {
@@ -224,6 +229,28 @@ function updateCursorHeading(heading) {
 
 function vehicleHtml(type, heading) {
   return `<div class="run-cursor-model run-cursor-${type}" style="--heading:${heading}deg">${VEHICLE_MODELS[type]}</div>`;
+}
+
+function toggleFollowUser() {
+  setFollowUser(!followUser);
+  if (followUser && !cursorLatLng) {
+    $('gps-info').textContent = '跟隨模式已開啟，等待下一個定位。';
+  }
+}
+
+function setFollowUser(enabled, { pan = true } = {}) {
+  followUser = enabled;
+  const button = $('btn-follow-user');
+  button.classList.toggle('active', followUser);
+  button.setAttribute('aria-pressed', String(followUser));
+  button.textContent = followUser ? '⌖ 跟隨中' : '⌖ 跟隨';
+  button.title = followUser ? '停止跟隨位置' : '放大並跟隨位置';
+  if (followUser && pan && cursorLatLng) followCurrentPosition(cursorLatLng);
+}
+
+function followCurrentPosition(latLng) {
+  if (!followUser || mapMode !== 'street') return;
+  map.setView(latLng, Math.max(map.getZoom(), FOLLOW_ZOOM), { animate: false });
 }
 
 function bearing(from, to) {
