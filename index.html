@@ -109,7 +109,20 @@
 
   <!-- Run -->
   <section id="view-run" class="view">
-    <div id="run-map" class="map"></div>
+    <div id="run-map" class="map">
+      <div id="run-track-diagram-overlay" class="track-diagram-overlay" hidden>
+        <div class="track-diagram-head">
+          <button id="btn-run-diagram-back" class="btn">返回 Run</button>
+          <div class="track-diagram-title">賽道圖模式</div>
+          <div class="track-diagram-filters" aria-label="Run 賽道圖篩選">
+            <label class="toggle"><input type="checkbox" id="run-diagram-filter-sector-colors" checked> Sector colors</label>
+            <label class="toggle"><input type="checkbox" id="run-diagram-filter-checkpoints" checked> Sector checkpoints</label>
+            <label class="toggle"><input type="checkbox" id="run-diagram-filter-lights"> Traffic lights</label>
+          </div>
+        </div>
+        <div id="run-track-diagram-svg" class="track-diagram-svg"></div>
+      </div>
+    </div>
     <div class="panel run-panel">
       <div id="run-status" class="run-status">Press ARM, then drive. Timing starts when you cross the start line.</div>
       <div id="offroute-flag" class="offroute-flag" role="alertdialog" aria-live="assertive" aria-labelledby="offroute-title" hidden>
@@ -146,18 +159,6 @@
         <button id="btn-simulate" class="btn">▶ Simulate run</button>
       </div>
       <div id="gps-info" class="hint"></div>
-    </div>
-    <div id="run-track-diagram-overlay" class="track-diagram-overlay" hidden>
-      <div class="track-diagram-head">
-        <button id="btn-run-diagram-back" class="btn">返回 Run</button>
-        <div class="track-diagram-title">賽道圖模式</div>
-        <div class="track-diagram-filters" aria-label="Run 賽道圖篩選">
-          <label class="toggle"><input type="checkbox" id="run-diagram-filter-sector-colors" checked> Sector colors</label>
-          <label class="toggle"><input type="checkbox" id="run-diagram-filter-checkpoints" checked> Sector checkpoints</label>
-          <label class="toggle"><input type="checkbox" id="run-diagram-filter-lights"> Traffic lights</label>
-        </div>
-      </div>
-      <div id="run-track-diagram-svg" class="track-diagram-svg"></div>
     </div>
   </section>
 

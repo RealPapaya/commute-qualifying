@@ -143,7 +143,6 @@ function setMapMode(mode, { resetFilters = false } = {}) {
   // Unhide before rendering: the diagram sizes its viewBox from the container,
   // which has no box while [hidden].
   $('run-track-diagram-overlay').hidden = mapMode !== 'track';
-  $('view-run').classList.toggle('diagram-mode', mapMode === 'track');
 
   if (mapMode === 'track') {
     if (resetFilters) resetTrackDiagramFilters();
