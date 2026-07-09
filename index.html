@@ -110,7 +110,11 @@
   <!-- Run -->
   <section id="view-run" class="view">
     <div id="run-map" class="map">
-      <button id="btn-follow-user" class="map-follow-btn" type="button" aria-pressed="false" title="放大並跟隨位置">⌖ 跟隨</button>
+      <div class="map-follow-controls" aria-label="跟隨位置控制">
+        <button id="btn-follow-zoom-out" class="map-follow-zoom" type="button" title="縮小" disabled>−</button>
+        <button id="btn-follow-user" class="map-follow-btn" type="button" aria-pressed="false" title="放大並跟隨位置">⌖ 跟隨</button>
+        <button id="btn-follow-zoom-in" class="map-follow-zoom" type="button" title="放大" disabled>+</button>
+      </div>
       <div id="run-track-diagram-overlay" class="track-diagram-overlay" hidden>
         <div class="track-diagram-head">
           <button id="btn-run-diagram-back" class="btn">返回 Run</button>

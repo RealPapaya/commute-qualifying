@@ -812,15 +812,30 @@ body {
   color: var(--text) !important;
 }
 
-.map-follow-btn {
+.map-follow-controls {
   position: absolute;
   top: 12px;
   right: 12px;
   z-index: 700;
-  min-height: 42px;
+  display: flex;
+  overflow: hidden;
   border: 1px solid rgba(0, 0, 0, 0.18);
   border-radius: var(--radius);
   background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.22);
+}
+
+#run-map.track-mode .map-follow-controls {
+  top: 72px;
+  z-index: 2205;
+}
+
+.map-follow-btn,
+.map-follow-zoom {
+  min-height: 42px;
+  border: 0;
+  border-right: 1px solid rgba(0, 0, 0, 0.12);
+  background: transparent;
   color: var(--text);
   padding: 8px 12px;
   cursor: pointer;
@@ -828,13 +843,27 @@ body {
   font-size: 12px;
   font-weight: 800;
   font-variation-settings: 'wdth' var(--w-label);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.22);
+}
+
+.map-follow-zoom {
+  min-width: 38px;
+  padding-inline: 10px;
+  font-size: 16px;
+}
+
+.map-follow-zoom:last-child {
+  border-right: 0;
 }
 
 .map-follow-btn.active {
   background: var(--bar);
-  border-color: var(--bar);
   color: #fff;
+}
+
+.map-follow-zoom:disabled {
+  color: var(--muted);
+  cursor: default;
+  opacity: 0.45;
 }
 
 .wp-marker {

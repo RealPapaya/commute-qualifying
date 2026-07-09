@@ -125,3 +125,9 @@ test('renderTrackDiagram: showSectorColors false draws one neutral route stroke'
   const strokes = collectByTag(svg, 'path').map(path => path.attributes.stroke);
   assert.deepEqual(strokes, ['#2a2a36', '#f2f2f2']);
 });
+
+test('renderTrackDiagram: focusDistance zooms the SVG viewBox around the marker', () => {
+  const svg = renderFakeDiagram({ currentDistance: 500, focusDistance: 500, focusZoom: 2 });
+  assert.equal(svg.attributes.viewBox, '250 175 500 350');
+  assert.equal(collectByTag(svg, 'circle').some(c => c.attributes.class === 'track-player-dot'), true);
+});

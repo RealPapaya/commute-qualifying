@@ -148,6 +148,19 @@ function pathD(pts) {
   return pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
 }
 
+function formatViewBox(viewBox) {
+  return viewBox.map(n => Number(n.toFixed(3))).join(' ');
+}
+
+function focusedViewBox(viewBox, [cx, cy], zoom) {
+  const z = Math.max(1, zoom || 1);
+  const [x0, y0, w, h] = viewBox;
+  const zw = w / z, zh = h / z;
+  const x = Math.max(x0, Math.min(x0 + w - zw, cx - zw / 2));
+  const y = Math.max(y0, Math.min(y0 + h - zh, cy - zh / 2));
+  return [x, y, zw, zh];
+}
+
 function startFinishTick(points, project, atIdx, dirIdx, label) {
   const [x1, y1] = project(points[atIdx]);
   const [x2, y2] = project(points[dirIdx]);
@@ -182,6 +195,8 @@ export function renderTrackDiagram(container, route, options = {}) {
     showSectorCheckpoints = true,
     showSectorColors = true,
     currentDistance = null,
+    focusDistance = null,
+    focusZoom = 1,
   } = options;
 
   const cum = cumulativeDistances(points);
@@ -194,7 +209,12 @@ export function renderTrackDiagram(container, route, options = {}) {
   const height = Math.round(Math.sqrt((VIEW_W * VIEW_H) / aspect));
   const width = Math.round(height * aspect);
   const { viewBox, project } = computeProjection(points, { width, height, pad: VIEW_PAD });
-  const svg = el('svg', { viewBox: viewBox.join(' '), preserveAspectRatio: 'xMidYMid meet' });
+  let activeViewBox = viewBox;
+  if (Number.isFinite(focusDistance)) {
+    const d = Math.max(0, Math.min(total, focusDistance));
+    activeViewBox = focusedViewBox(viewBox, project(pointAtDistance(points, cum, d)), focusZoom);
+  }
+  const svg = el('svg', { viewBox: formatViewBox(activeViewBox), preserveAspectRatio: 'xMidYMid meet' });
 
   // dark casing: one continuous stroke under everything, so sector-color
   // seams never show a gap
