@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { haversine, cumulativeDistances, projectOnRoute, pointAtDistance }
   from '../js/geo.js';
-import { createRun, feedFix, classifySector } from '../js/timing.js';
+import { createRun, feedFix, classifySector, fmtTime, fmtDelta } from '../js/timing.js';
 
 // ---- fixture: 3 km straight route heading north, points every 100 m ----
 const M_PER_DEG_LAT = 111195;
@@ -146,4 +146,14 @@ test('classifySector: purple / green / yellow', () => {
   assert.equal(classifySector(59000, 60000, 61000), 'purple');    // beats all-time
   assert.equal(classifySector(60500, 60000, 61000), 'green');     // beats session
   assert.equal(classifySector(62000, 60000, 61000), 'yellow');    // beats neither
+});
+test('fmtTime: displays centiseconds', () => {
+  assert.equal(fmtTime(null), '--:--.--');
+  assert.equal(fmtTime(65432), '1:05.43');
+  assert.equal(fmtTime(-1234), '-0:01.23');
+});
+
+test('fmtDelta: displays signed seconds with two decimals', () => {
+  assert.equal(fmtDelta(-1234), '−1.23');
+  assert.equal(fmtDelta(987), '+0.99');
 });

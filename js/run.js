@@ -14,11 +14,14 @@ let sessionBests = null;   // per-sector session bests (green reference)
 let watchId = null, wakeLock = null, simTimer = null;
 let clockTimer = null;
 let simNow = null;         // simulated clock when replaying
-let onRunSaved = null;
+let onRunSaved = null, onReplanRoute = null;
 let cursorType = 'dot';
 let cursorLatLng = null;
 let cursorHeading = 0;
 let mapMode = 'street';
+let trackCursorDistance = null;
+let offRouteFlagActive = false;
+let offRoutePromptDismissed = false;
 
 const $ = id => document.getElementById(id);
 const CURSOR_TYPES = new Set(['dot', 'car', 'racecar', 'motorcycle']);
@@ -57,6 +60,7 @@ const VEHICLE_MODELS = {
 
 export function initRun(callbacks) {
   onRunSaved = callbacks.onRunSaved;
+  onReplanRoute = callbacks.onReplanRoute;
   map = L.map('run-map').setView([25.04, 121.53], 13);
   window._runMap = map; // test hook (e2e driver)
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -66,6 +70,8 @@ export function initRun(callbacks) {
 
   $('btn-arm').addEventListener('click', armGps);
   $('btn-abort').addEventListener('click', () => stopSession('Aborted.'));
+  $('btn-replan-route').addEventListener('click', replanRoute);
+  $('btn-wait-track').addEventListener('click', waitForTrack);
   $('btn-simulate').addEventListener('click', simulate);
   $('run-map-mode').addEventListener('change', () => setMapMode(selectedMapMode(), { resetFilters: true }));
   $('btn-run-diagram-back').addEventListener('click', hideTrackDiagram);
@@ -79,6 +85,8 @@ export function initRun(callbacks) {
 export function openRun(r) {
   stopSession();
   route = { ...r, cum: cumulativeDistances(r.points) };
+  trackCursorDistance = null;
+  resetOffRouteFlag();
   setMapMode(selectedMapMode(), { resetFilters: true });
   bests = allTimeBests(route.id, route.sectorBoundaries.length + 1, route.timingVersion);
   sessionBests = route.sectorBoundaries.map(() => null).concat([null]);
@@ -143,6 +151,7 @@ function refreshTrackDiagram() {
   renderTrackDiagram($('run-track-diagram-svg'), route, {
     showSectorCheckpoints: $('run-diagram-filter-checkpoints').checked,
     showLights: $('run-diagram-filter-lights').checked,
+    currentDistance: trackCursorDistance,
   });
 }
 
@@ -280,14 +289,58 @@ function simulate() {
 
 // ---------- Shared session plumbing ----------
 
+function updateTrackCursor() {
+  if (!run?.lastFix) return;
+  trackCursorDistance = run.state === 'finished' ? route.cum.at(-1) : run.maxProgress;
+  if (mapMode === 'track') refreshTrackDiagram();
+}
+
+function showOffRouteFlag() {
+  offRouteFlagActive = true;
+  setStatus('YELLOW FLAG — off route. Timing is holding at the last valid trace position.', 'yellow');
+  if (!offRoutePromptDismissed) $('offroute-flag').hidden = false;
+}
+
+function waitForTrack() {
+  offRoutePromptDismissed = true;
+  $('offroute-flag').hidden = true;
+  setStatus('YELLOW FLAG — waiting until GPS returns to the trace.', 'yellow');
+}
+
+function replanRoute() {
+  const routeId = route?.id;
+  resetOffRouteFlag();
+  stopSession('Replanning route.');
+  if (routeId) onReplanRoute?.(routeId);
+}
+
+function clearOffRouteFlag() {
+  const wasOffRoute = offRouteFlagActive;
+  resetOffRouteFlag();
+  if (wasOffRoute && run?.state === 'running') setStatus('LIVE — back on route.', 'live');
+}
+
+function resetOffRouteFlag() {
+  offRouteFlagActive = false;
+  offRoutePromptDismissed = false;
+  const el = $('offroute-flag');
+  if (el) el.hidden = true;
+}
+
 function handleFix(fix) {
   if (!run) return;
   const ev = feedFix(run, fix);
 
   showCursor([fix.lat, fix.lng]);
+  updateTrackCursor();
+
+  if (ev === 'offroute') {
+    showOffRouteFlag();
+    return;
+  }
+  if (offRouteFlagActive) clearOffRouteFlag();
 
   if (ev === 'start') setStatus('LIVE — lap running.', 'live');
-  if (ev === 'offroute') setStatus('LIVE — off route? Timing continues at last position.', 'armed');
   if (ev === 'sector') { setStatus('LIVE — lap running.', 'live'); renderBoard(); }
   if (ev === 'finish') finishRun();
   if (ev === 'start') renderBoard();
@@ -324,10 +377,13 @@ function stopSession(statusMsg, keepBoard = false) {
   if (clockTimer != null) { clearInterval(clockTimer); clockTimer = null; }
   wakeLock?.release().catch(() => {});
   wakeLock = null;
+  resetOffRouteFlag();
   if (!keepBoard) {
     run = null;
     if (posMarker) { posMarker.remove(); posMarker = null; }
     cursorLatLng = null;
+    trackCursorDistance = null;
+    if (mapMode === 'track') refreshTrackDiagram();
     $('run-clock').textContent = fmtTime(null);
   }
   $('btn-arm').disabled = false;

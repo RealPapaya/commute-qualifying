@@ -115,7 +115,7 @@ export function renderTrackDiagram(container, route, options = {}) {
   container.innerHTML = '';
   const points = route?.points || [];
   if (points.length < 2) return;
-  const { showLights = false, showSectorCheckpoints = true } = options;
+  const { showLights = false, showSectorCheckpoints = true, currentDistance = null } = options;
 
   const cum = cumulativeDistances(points);
   const total = cum.at(-1);
@@ -177,6 +177,19 @@ export function renderTrackDiagram(container, route, options = {}) {
         cx: x, cy: y, r: 6, class: 'track-light-dot', fill: '#ffd600', stroke: '#000', 'stroke-width': 1.5,
       }));
     });
+  }
+
+  if (Number.isFinite(currentDistance)) {
+    const d = Math.max(0, Math.min(total, currentDistance));
+    const [x, y] = project(pointAtDistance(points, cum, d));
+    const g = el('g', { class: 'track-player-marker' });
+    g.appendChild(el('circle', {
+      cx: x, cy: y, r: 15, class: 'track-player-halo', fill: '#00c853', opacity: 0.22,
+    }));
+    g.appendChild(el('circle', {
+      cx: x, cy: y, r: 7, class: 'track-player-dot', fill: '#00c853', stroke: '#fff', 'stroke-width': 2,
+    }));
+    svg.appendChild(g);
   }
 
   // name + total distance, matching the editor's existing stats format

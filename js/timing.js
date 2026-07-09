@@ -116,17 +116,17 @@ export function classifySector(timeMs, allTimeMs, sessionMs) {
 }
 
 export function fmtTime(ms) {
-  if (ms == null) return '--:--.-';
+  if (ms == null) return '--:--.--';
   const neg = ms < 0;
   ms = Math.abs(ms);
   const m = Math.floor(ms / 60000);
   const s = Math.floor((ms % 60000) / 1000);
-  const t = Math.floor((ms % 1000) / 100);
-  return `${neg ? '-' : ''}${m}:${String(s).padStart(2, '0')}.${t}`;
+  const cs = Math.floor((ms % 1000) / 10);
+  return `${neg ? '-' : ''}${m}:${String(s).padStart(2, '0')}.${String(cs).padStart(2, '0')}`;
 }
 
 export function fmtDelta(ms) {
   if (ms == null) return '';
   const sign = ms < 0 ? '−' : '+';
-  return `${sign}${(Math.abs(ms) / 1000).toFixed(1)}`;
+  return `${sign}${(Math.abs(ms) / 1000).toFixed(2)}`;
 }

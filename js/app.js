@@ -169,5 +169,11 @@ initEditor({
 });
 initRun({
   onRunSaved() { /* history re-renders on tab open */ },
+  onReplanRoute(routeId) {
+    activeRouteId = routeId;
+    editorLoadedId = null;
+    enableTabs(true, true);
+    showView('editor');
+  },
 });
 renderRouteList();

@@ -135,7 +135,27 @@ body {
 .run-status { font-size: 13px; color: var(--dim); margin-bottom: 6px; }
 .run-status.live { color: var(--green); }
 .run-status.armed { color: var(--yellow); }
+.run-status.yellow { color: var(--yellow); }
 
+.offroute-flag {
+  border: 1px solid var(--yellow);
+  background: #2b2508;
+  padding: 10px;
+  margin: 0 0 10px;
+}
+.offroute-title {
+  color: var(--yellow);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.offroute-copy {
+  color: var(--text);
+  font-size: 12px;
+  margin-top: 4px;
+}
+.offroute-actions { margin-bottom: 0; }
 .run-clock {
   font-family: Consolas, "Roboto Mono", monospace;
   font-size: 44px;
