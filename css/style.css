@@ -493,18 +493,26 @@ body {
   padding-top: 2px;
 }
 
-.editor-panel > .toolbar:not(#editor-toolbar) {
+.editor-tool-actions,
+.editor-route-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-#btn-save-route {
-  grid-column: 1 / -1;
-  order: -1;
+.editor-tool-actions[hidden] {
+  display: none;
 }
 
-#btn-track-diagram {
+.editor-tool-actions > .btn:only-child {
   grid-column: 1 / -1;
+}
+
+.editor-route-actions {
+  grid-template-columns: 1fr;
+}
+
+#btn-save-route {
+  order: -1;
 }
 
 .sector-summary {
@@ -1016,7 +1024,8 @@ body {
 }
 
 @media (max-width: 430px) {
-  .editor-panel > .toolbar:not(#editor-toolbar) {
+  .editor-tool-actions,
+  .editor-route-actions {
     grid-template-columns: 1fr;
   }
 

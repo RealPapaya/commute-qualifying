@@ -74,11 +74,20 @@
         <label class="toggle"><input type="checkbox" id="snap-toggle" checked> Snap to roads</label>
       </div>
       <div id="tool-help" class="hint"></div>
-      <div class="toolbar">
-        <button id="btn-undo-wp" class="btn">↩ Undo point</button>
-        <button id="btn-clear-route" class="btn danger">Clear trace</button>
-        <button id="btn-add-sector" class="btn">+ Sector</button>
-        <button id="btn-remove-sector" class="btn">− Sector</button>
+      <div id="editor-tool-actions">
+        <div class="toolbar editor-tool-actions" data-tool-actions="trace">
+          <button id="btn-undo-wp" class="btn">↩ Undo point</button>
+          <button id="btn-clear-route" class="btn danger">Clear trace</button>
+        </div>
+        <div class="toolbar editor-tool-actions" data-tool-actions="light" hidden>
+          <button id="btn-clear-lights" class="btn danger">Clear lights</button>
+        </div>
+        <div class="toolbar editor-tool-actions" data-tool-actions="sector" hidden>
+          <button id="btn-add-sector" class="btn">+ Sector</button>
+          <button id="btn-remove-sector" class="btn">− Sector</button>
+        </div>
+      </div>
+      <div class="toolbar editor-route-actions">
         <button id="btn-track-diagram" class="btn" disabled title="Show F1-style circuit diagram">🏁 賽道圖</button>
         <button id="btn-save-route" class="btn primary">Save</button>
       </div>

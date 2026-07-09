@@ -38,6 +38,7 @@ export function initEditor(callbacks) {
   document.getElementById('snap-toggle').addEventListener('change', rebuildGeometry);
   document.getElementById('btn-undo-wp').addEventListener('click', undoWaypoint);
   document.getElementById('btn-clear-route').addEventListener('click', clearTrace);
+  document.getElementById('btn-clear-lights').addEventListener('click', clearLights);
   document.getElementById('btn-save-route').addEventListener('click', persist);
   document.getElementById('btn-add-sector').addEventListener('click', () => changeSectorCount(+1));
   document.getElementById('btn-remove-sector').addEventListener('click', () => changeSectorCount(-1));
@@ -55,7 +56,14 @@ export function initEditor(callbacks) {
     rebuild: rebuildGeometry,
     onAfterRebuild,
   });
-  initLightsImport({ getRoute: () => route, onImported: redrawLights, onAfterRebuild });
+  initLightsImport({
+    getRoute: () => route,
+    onImported: () => {
+      redrawLights();
+      refreshStats();
+    },
+    onAfterRebuild,
+  });
 }
 
 // Register a callback to run every time redrawAll() has recreated the
@@ -99,11 +107,18 @@ function flashHelp(msg) {
 }
 
 function setTool(tool) {
-  activeTool = tool;
+  activeTool = TOOL_HELP[tool] ? tool : 'trace';
   document.querySelectorAll('#editor-toolbar .tool').forEach(b =>
-    b.classList.toggle('active', b.dataset.tool === tool));
-  document.getElementById('tool-help').textContent = TOOL_HELP[tool];
-  renderSectorHandles(tool === 'sector');
+    b.classList.toggle('active', b.dataset.tool === activeTool));
+  document.getElementById('tool-help').textContent = TOOL_HELP[activeTool];
+  renderSectorHandles(activeTool === 'sector');
+  updateToolActions(activeTool);
+}
+
+function updateToolActions(tool) {
+  document.querySelectorAll('[data-tool-actions]').forEach(group => {
+    group.hidden = group.dataset.toolActions !== tool;
+  });
 }
 
 function onMapClick(e) {
@@ -114,6 +129,7 @@ function onMapClick(e) {
   } else if (activeTool === 'light') {
     route.lights.push(p);
     redrawLights();
+    refreshStats();
   }
 }
 
@@ -128,6 +144,14 @@ function clearTrace() {
   route.lights = [];
   route.sectorBoundaries = [];
   rebuildGeometry();
+}
+
+function clearLights() {
+  if (!route?.lights.length) return;
+  if (!confirm('Clear all traffic lights?')) return;
+  route.lights = [];
+  redrawLights();
+  refreshStats();
 }
 
 // Rebuild route.points from waypoints (OSRM snap or straight lines), then
@@ -267,6 +291,7 @@ function refreshStats() {
   document.getElementById('route-stats').textContent =
     `${total} km · ${route.lights.length} 🚦 · ${route.sectorBoundaries.length + 1} sectors`;
   document.getElementById('btn-track-diagram').disabled = route.points.length <= 1;
+  document.getElementById('btn-clear-lights').disabled = route.lights.length === 0;
 }
 
 // Diagram mode renders the current in-memory route as a clean circuit view.
