@@ -10,7 +10,7 @@ import { saveRoute, getRoute, newId } from './store.js';
 const OSRM = 'https://router.project-osrm.org/route/v1/driving/';
 
 let map, route, activeTool = 'trace';
-let routeLine, wpMarkers = [], lightMarkers = [];
+let routeLine, routeLineCasing, wpMarkers = [], lightMarkers = [];
 let onSaved = null;
 let buildSeq = 0; // stale-response guard for async OSRM rebuilds
 let afterRebuildHandlers = []; // hooks run once the polyline/markers are freshly redrawn
@@ -223,10 +223,19 @@ function redrawAll() {
 }
 
 function redrawLine() {
+  if (routeLineCasing) routeLineCasing.remove();
   if (routeLine) routeLine.remove();
+  routeLineCasing = null;
   routeLine = null;
   if (route.points.length > 1) {
-    routeLine = L.polyline(route.points, { color: '#e10600', weight: 4 }).addTo(map);
+    routeLineCasing = L.polyline(route.points, {
+      color: '#050608', weight: 11, opacity: 0.72, interactive: false,
+      className: 'route-line-casing',
+    }).addTo(map);
+    routeLine = L.polyline(route.points, {
+      color: '#f7f8f8', weight: 5, opacity: 0.98,
+      className: 'route-line-core route-line-editor',
+    }).addTo(map);
   }
 }
 

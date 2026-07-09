@@ -213,7 +213,7 @@ body {
   position: relative;
   flex: 1;
   min-height: 0;
-  background: #cfd3d6;
+  background: #101317;
 }
 
 .map::after {
@@ -221,8 +221,11 @@ body {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  box-shadow: inset 0 -60px 60px rgba(45, 45, 45, 0.28);
-  z-index: 400;
+  background:
+    linear-gradient(180deg, rgba(8, 10, 12, 0.08), rgba(8, 10, 12, 0.34)),
+    radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.06), transparent 58%);
+  box-shadow: inset 0 -70px 76px rgba(0, 0, 0, 0.48);
+  z-index: 390;
 }
 
 /* --- surfaces --- */
@@ -793,23 +796,33 @@ body {
 /* --- leaflet --- */
 
 .leaflet-container {
-  background: #cfd3d6;
+  background: #101317;
   font-family: 'Archivo', system-ui, sans-serif;
 }
 
+.leaflet-tile {
+  filter: grayscale(1) invert(1) brightness(0.58) contrast(1.18) saturate(0.24);
+}
+
+.leaflet-overlay-pane svg {
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.46));
+}
+
 .leaflet-control-attribution {
-  background: rgba(255, 255, 255, 0.78) !important;
-  color: #555 !important;
+  background: rgba(12, 15, 18, 0.76) !important;
+  color: rgba(255, 255, 255, 0.58) !important;
+  backdrop-filter: blur(8px);
 }
 
 .leaflet-control-attribution a {
-  color: #333 !important;
+  color: rgba(255, 255, 255, 0.78) !important;
 }
 
 .leaflet-control-zoom a {
-  background: rgba(255, 255, 255, 0.92) !important;
-  border-color: var(--border) !important;
-  color: var(--text) !important;
+  background: rgba(12, 15, 18, 0.86) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  color: #fff !important;
+  backdrop-filter: blur(8px);
 }
 
 .map-follow-controls {
@@ -819,10 +832,11 @@ body {
   z-index: 700;
   display: flex;
   overflow: hidden;
-  border: 1px solid rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.22);
+  background: rgba(12, 15, 18, 0.86);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(8px);
 }
 
 #run-map.track-mode .map-follow-controls {
@@ -834,9 +848,9 @@ body {
 .map-follow-zoom {
   min-height: 42px;
   border: 0;
-  border-right: 1px solid rgba(0, 0, 0, 0.12);
+  border-right: 1px solid rgba(255, 255, 255, 0.14);
   background: transparent;
-  color: var(--text);
+  color: rgba(255, 255, 255, 0.86);
   padding: 8px 12px;
   cursor: pointer;
   font-family: inherit;
@@ -856,8 +870,33 @@ body {
 }
 
 .map-follow-btn.active {
-  background: var(--bar);
-  color: #fff;
+  background: #fff;
+  color: #0c0f12;
+}
+
+.route-line-casing {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.route-line-core {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.28));
+}
+
+.route-line-run {
+  filter:
+    drop-shadow(0 0 8px rgba(255, 255, 255, 0.30))
+    drop-shadow(0 0 14px rgba(225, 6, 0, 0.28));
+}
+
+.run-sector-marker {
+  filter: drop-shadow(0 0 8px rgba(255, 210, 63, 0.42));
+}
+
+.run-position-marker {
+  filter: drop-shadow(0 0 10px rgba(46, 230, 107, 0.48));
 }
 
 .map-follow-zoom:disabled {
@@ -869,30 +908,32 @@ body {
 .wp-marker {
   width: 14px !important;
   height: 14px !important;
-  border: 3px solid #fff;
+  border: 3px solid #f7f8f8;
   border-radius: 50%;
   background: var(--accent);
-  box-shadow: 0 0 0 5px rgba(255, 45, 45, 0.2);
+  box-shadow:
+    0 0 0 5px rgba(225, 6, 0, 0.22),
+    0 8px 18px rgba(0, 0, 0, 0.54);
 }
 
 .light-icon {
   position: relative;
   width: 18px !important;
   height: 18px !important;
-  border: 2px solid rgba(0, 0, 0, 0.7);
+  border: 2px solid #101317;
   border-radius: 50%;
   background: var(--yellow-vivid);
   color: transparent;
   font-size: 0;
-  box-shadow: 0 0 0 5px rgba(255, 210, 63, 0.2), 0 5px 12px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 0 0 5px rgba(255, 210, 63, 0.22), 0 8px 18px rgba(0, 0, 0, 0.58);
 }
 
 .sector-handle {
-  border: 2px solid #111;
+  border: 2px solid #101317;
   border-radius: var(--radius);
   background: var(--yellow-vivid);
   cursor: grab;
-  box-shadow: 0 0 0 5px rgba(255, 210, 63, 0.16);
+  box-shadow: 0 0 0 5px rgba(255, 210, 63, 0.2), 0 8px 18px rgba(0, 0, 0, 0.48);
 }
 
 #view-editor,
@@ -900,7 +941,7 @@ body {
   position: relative;
 }
 
-/* --- track diagram: grey gradient, white racing line, red accents --- */
+/* --- track diagram: dark map surface, white racing line, red accents --- */
 
 .track-diagram-overlay {
   position: absolute;
@@ -909,7 +950,9 @@ body {
      layout the panel paints over the diagram and hides its centred track.
      Stays under #tabs (5000) and .summary-overlay (6000). */
   z-index: 2200;
-  background: linear-gradient(180deg, #9a9c9b 0%, #6c7479 52%, #949da1 100%);
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.10), transparent 52%),
+    linear-gradient(180deg, #181d22 0%, #101317 54%, #090b0e 100%);
   flex-direction: column;
 }
 
@@ -929,10 +972,10 @@ body {
 
 .track-diagram-head .btn {
   min-height: 38px;
-  border: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.42);
-  color: #15151e;
+  background: rgba(12, 15, 18, 0.78);
+  color: #fff;
   backdrop-filter: blur(6px);
 }
 
@@ -954,12 +997,13 @@ body {
   margin-left: auto;
   padding: 6px 10px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(12, 15, 18, 0.70);
   backdrop-filter: blur(6px);
 }
 
 .track-diagram-filters .toggle {
-  color: #15151e;
+  color: rgba(255, 255, 255, 0.86);
   font-weight: 700;
 }
 

@@ -111,10 +111,18 @@ export function openRun(r) {
 
   if (routeLayer) routeLayer.remove();
   routeLayer = L.layerGroup().addTo(map);
-  L.polyline(route.points, { color: '#e10600', weight: 4 }).addTo(routeLayer);
+  L.polyline(route.points, {
+    color: '#050608', weight: 11, opacity: 0.72, interactive: false,
+    className: 'route-line-casing',
+  }).addTo(routeLayer);
+  L.polyline(route.points, {
+    color: '#f7f8f8', weight: 5, opacity: 0.98,
+    className: 'route-line-core route-line-run',
+  }).addTo(routeLayer);
   route.sectorBoundaries.forEach(d => {
     L.circleMarker(pointAtDistance(route.points, route.cum, d),
-      { radius: 6, color: '#ffd600', fillOpacity: 0.9 }).addTo(routeLayer);
+      { radius: 6, color: '#101317', weight: 2, fillColor: '#ffd600',
+        fillOpacity: 0.94, className: 'run-sector-marker' }).addTo(routeLayer);
   });
   route.lights.forEach(p => {
     L.marker(p, { icon: L.divIcon({ className: 'light-icon', html: '🚦', iconSize: [20, 20] }) })
@@ -218,7 +226,8 @@ function drawCursor(latLng, heading) {
 function createCursorMarker(latLng, heading) {
   if (cursorType === 'dot') {
     return L.circleMarker(latLng,
-      { radius: 8, color: '#00c853', fillColor: '#00c853', fillOpacity: 0.9 }).addTo(map);
+      { radius: 8, color: '#f7f8f8', weight: 2, fillColor: '#00c853',
+        fillOpacity: 0.94, className: 'run-position-marker' }).addTo(map);
   }
   return L.marker(latLng, {
     interactive: false,
