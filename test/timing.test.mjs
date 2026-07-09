@@ -147,10 +147,10 @@ test('classifySector: purple / green / yellow', () => {
   assert.equal(classifySector(60500, 60000, 61000), 'green');     // beats session
   assert.equal(classifySector(62000, 60000, 61000), 'yellow');    // beats neither
 });
-test('fmtTime: displays centiseconds', () => {
-  assert.equal(fmtTime(null), '--:--.--');
-  assert.equal(fmtTime(65432), '1:05.43');
-  assert.equal(fmtTime(-1234), '-0:01.23');
+test('fmtTime: displays minutes, seconds, and milliseconds', () => {
+  assert.equal(fmtTime(null), '--:--:---');
+  assert.equal(fmtTime(65432), '01:05:432');
+  assert.equal(fmtTime(-1234), '-00:01:234');
 });
 
 test('fmtDelta: displays signed seconds with two decimals', () => {

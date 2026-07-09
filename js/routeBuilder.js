@@ -43,6 +43,7 @@ export function initEditor(callbacks) {
   document.getElementById('btn-remove-sector').addEventListener('click', () => changeSectorCount(-1));
   document.getElementById('btn-track-diagram').addEventListener('click', showTrackDiagram);
   document.getElementById('btn-diagram-back').addEventListener('click', hideTrackDiagram);
+  document.getElementById('diagram-filter-sector-colors').addEventListener('change', refreshTrackDiagram);
   document.getElementById('diagram-filter-checkpoints').addEventListener('change', refreshTrackDiagram);
   document.getElementById('diagram-filter-lights').addEventListener('change', refreshTrackDiagram);
 
@@ -284,6 +285,7 @@ function hideTrackDiagram() {
 }
 
 function resetTrackDiagramFilters() {
+  document.getElementById('diagram-filter-sector-colors').checked = true;
   document.getElementById('diagram-filter-checkpoints').checked = true;
   document.getElementById('diagram-filter-lights').checked = false;
 }
@@ -291,6 +293,7 @@ function resetTrackDiagramFilters() {
 function refreshTrackDiagram() {
   if (!route || route.points.length < 2) return;
   renderTrackDiagram(document.getElementById('track-diagram-svg'), route, {
+    showSectorColors: document.getElementById('diagram-filter-sector-colors').checked,
     showSectorCheckpoints: document.getElementById('diagram-filter-checkpoints').checked,
     showLights: document.getElementById('diagram-filter-lights').checked,
   });

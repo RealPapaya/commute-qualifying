@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { computeProjection, normalizeToViewBox, splitIntoSectors } from '../js/trackDiagram.js';
+import { computeProjection, normalizeToViewBox, splitIntoSectors, renderTrackDiagram } from '../js/trackDiagram.js';
 import { cumulativeDistances, pointAtDistance } from '../js/geo.js';
 
 // ---- normalizeToViewBox / computeProjection ----
@@ -65,4 +65,63 @@ test('splitIntoSectors: boundaries outside (0, total) are ignored', () => {
 test('splitIntoSectors: fewer than 2 points is a no-op (single segment or none)', () => {
   assert.deepEqual(splitIntoSectors([straight[0]], [100]), [[straight[0]]]);
   assert.deepEqual(splitIntoSectors([], [100]), []);
+});
+// ---- renderTrackDiagram options ----
+function createFakeSvgElement(tagName) {
+  return {
+    tagName,
+    attributes: {},
+    children: [],
+    textContent: '',
+    setAttribute(name, value) { this.attributes[name] = String(value); },
+    appendChild(child) { this.children.push(child); return child; },
+  };
+}
+
+function collectByTag(node, tagName) {
+  const matches = [];
+  const walk = n => {
+    if (n.tagName === tagName) matches.push(n);
+    (n.children || []).forEach(walk);
+  };
+  walk(node);
+  return matches;
+}
+
+function withFakeDocument(fn) {
+  const previous = globalThis.document;
+  globalThis.document = { createElementNS: (ns, tagName) => createFakeSvgElement(tagName) };
+  try {
+    return fn();
+  } finally {
+    if (previous === undefined) delete globalThis.document;
+    else globalThis.document = previous;
+  }
+}
+
+function renderFakeDiagram(options = {}) {
+  const container = {
+    innerHTML: 'old',
+    children: [],
+    appendChild(child) { this.children.push(child); return child; },
+  };
+  withFakeDocument(() => renderTrackDiagram(container, {
+    name: 'Test route',
+    points: straight,
+    sectorBoundaries: [300, 700],
+    lights: [],
+  }, options));
+  return container.children[0];
+}
+
+test('renderTrackDiagram: sector colors are on by default', () => {
+  const svg = renderFakeDiagram();
+  const strokes = collectByTag(svg, 'path').map(path => path.attributes.stroke);
+  assert.deepEqual(strokes, ['#2a2a36', '#e10600', '#2979ff', '#ffd600']);
+});
+
+test('renderTrackDiagram: showSectorColors false draws one neutral route stroke', () => {
+  const svg = renderFakeDiagram({ showSectorColors: false });
+  const strokes = collectByTag(svg, 'path').map(path => path.attributes.stroke);
+  assert.deepEqual(strokes, ['#2a2a36', '#f2f2f2']);
 });

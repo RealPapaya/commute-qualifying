@@ -7,6 +7,7 @@ import { cumulativeDistances, pointAtDistance, haversine } from './geo.js';
 const VIEW_W = 1000, VIEW_H = 700, VIEW_PAD = 60;
 const SECTOR_COLORS = ['#e10600', '#2979ff', '#ffd600']; // F1 S1 red / S2 blue / S3 yellow, cycled
 const CASING_COLOR = '#2a2a36'; // matches css var(--border)
+const TRACK_COLOR = '#f2f2f2';
 const CASING_WIDTH = 13;
 const TRACK_WIDTH = 7;
 const LOOP_THRESHOLD_M = 30; // start ~= finish within this distance counts as a loop
@@ -115,7 +116,12 @@ export function renderTrackDiagram(container, route, options = {}) {
   container.innerHTML = '';
   const points = route?.points || [];
   if (points.length < 2) return;
-  const { showLights = false, showSectorCheckpoints = true, currentDistance = null } = options;
+  const {
+    showLights = false,
+    showSectorCheckpoints = true,
+    showSectorColors = true,
+    currentDistance = null,
+  } = options;
 
   const cum = cumulativeDistances(points);
   const total = cum.at(-1);
@@ -130,12 +136,16 @@ export function renderTrackDiagram(container, route, options = {}) {
     'stroke-linecap': 'round', 'stroke-linejoin': 'round',
   }));
 
-  // sector-tinted top stroke
-  const segments = splitIntoSectors(points, route.sectorBoundaries || []);
+  // sector-tinted top stroke, or one neutral stroke when color grouping is off
+  const segments = showSectorColors ?
+    splitIntoSectors(points, route.sectorBoundaries || []) :
+    [points];
   segments.forEach((seg, i) => {
     svg.appendChild(el('path', {
       d: pathD(seg.map(project)),
-      fill: 'none', stroke: SECTOR_COLORS[i % SECTOR_COLORS.length], 'stroke-width': TRACK_WIDTH,
+      fill: 'none',
+      stroke: showSectorColors ? SECTOR_COLORS[i % SECTOR_COLORS.length] : TRACK_COLOR,
+      'stroke-width': TRACK_WIDTH,
       'stroke-linecap': 'round', 'stroke-linejoin': 'round',
     }));
   });

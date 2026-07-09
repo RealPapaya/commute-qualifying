@@ -14,6 +14,8 @@ let sessionBests = null;   // per-sector session bests (green reference)
 let watchId = null, wakeLock = null, simTimer = null;
 let clockTimer = null;
 let simNow = null;         // simulated clock when replaying
+let simClockAnchorTime = 0;
+let simClockAnchorReal = null;
 let onRunSaved = null, onReplanRoute = null;
 let cursorType = 'dot';
 let cursorLatLng = null;
@@ -26,6 +28,10 @@ let offRoutePromptDismissed = false;
 const $ = id => document.getElementById(id);
 const CURSOR_TYPES = new Set(['dot', 'car', 'racecar', 'motorcycle']);
 const MAP_MODES = new Set(['street', 'track']);
+const SIM_FIX_INTERVAL_MS = 100;
+const SIM_SPEEDUP = 10;
+const CLOCK_REFRESH_MS = 16;
+const BOARD_REFRESH_MS = 100;
 const CURSOR_TURN_THRESHOLD_M = 3;
 const VEHICLE_MODELS = {
   car: `<svg viewBox="0 0 48 48" aria-hidden="true">
@@ -75,6 +81,7 @@ export function initRun(callbacks) {
   $('btn-simulate').addEventListener('click', simulate);
   $('run-map-mode').addEventListener('change', () => setMapMode(selectedMapMode(), { resetFilters: true }));
   $('btn-run-diagram-back').addEventListener('click', hideTrackDiagram);
+  $('run-diagram-filter-sector-colors').addEventListener('change', refreshTrackDiagram);
   $('run-diagram-filter-checkpoints').addEventListener('change', refreshTrackDiagram);
   $('run-diagram-filter-lights').addEventListener('change', refreshTrackDiagram);
   $('run-cursor-type').addEventListener('change', () => setCursorType(selectedCursorType()));
@@ -142,6 +149,7 @@ function setMapMode(mode, { resetFilters = false } = {}) {
 }
 
 function resetTrackDiagramFilters() {
+  $('run-diagram-filter-sector-colors').checked = true;
   $('run-diagram-filter-checkpoints').checked = true;
   $('run-diagram-filter-lights').checked = false;
 }
@@ -149,6 +157,7 @@ function resetTrackDiagramFilters() {
 function refreshTrackDiagram() {
   if (!route || route.points.length < 2) return;
   renderTrackDiagram($('run-track-diagram-svg'), route, {
+    showSectorColors: $('run-diagram-filter-sector-colors').checked,
     showSectorCheckpoints: $('run-diagram-filter-checkpoints').checked,
     showLights: $('run-diagram-filter-lights').checked,
     currentDistance: trackCursorDistance,
@@ -270,21 +279,32 @@ function simulate() {
   const total = route.cum.at(-1);
   let simDist = -10;               // start slightly before the line
   let t = 0;
-  simNow = 0;
+  setSimClock(0);
   simTimer = setInterval(() => {
     const speed = 9 + Math.random() * 8;   // m/s
     simDist += speed;
-    t += 1000;
-    simNow = t;
+    t += SIM_FIX_INTERVAL_MS * SIM_SPEEDUP;
+    setSimClock(t);
     const p = pointAtDistance(route.points, route.cum, Math.max(0, simDist));
     const jitter = () => (Math.random() - 0.5) * 0.00008; // ~±5 m
     handleFix({ lat: p[0] + jitter(), lng: p[1] + jitter(), t });
     if (simDist > total + 30 || run?.state === 'finished') {
       if (run && run.state !== 'finished') stopSession('Simulation ended.');
     }
-  }, 100);
+  }, SIM_FIX_INTERVAL_MS);
 
-  startClock(() => simNow);
+  startClock(simulatedNow);
+}
+
+function setSimClock(timeMs) {
+  simNow = timeMs;
+  simClockAnchorTime = timeMs;
+  simClockAnchorReal = performance.now();
+}
+
+function simulatedNow() {
+  if (simClockAnchorReal == null) return simNow ?? 0;
+  return simClockAnchorTime + (performance.now() - simClockAnchorReal) * SIM_SPEEDUP;
 }
 
 // ---------- Shared session plumbing ----------
@@ -375,6 +395,9 @@ function stopSession(statusMsg, keepBoard = false) {
   if (watchId != null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
   if (simTimer != null) { clearInterval(simTimer); simTimer = null; }
   if (clockTimer != null) { clearInterval(clockTimer); clockTimer = null; }
+  simNow = null;
+  simClockAnchorTime = 0;
+  simClockAnchorReal = null;
   wakeLock?.release().catch(() => {});
   wakeLock = null;
   resetOffRouteFlag();
@@ -393,11 +416,16 @@ function stopSession(statusMsg, keepBoard = false) {
 }
 
 function startClock(now) {
+  let lastBoardRefresh = 0;
   clockTimer = setInterval(() => {
     if (!run || run.state !== 'running') return;
+    const frameNow = performance.now();
     $('run-clock').textContent = fmtTime(elapsed(run, now()));
-    renderBoard(true);
-  }, 100);
+    if (frameNow - lastBoardRefresh >= BOARD_REFRESH_MS) {
+      renderBoard(true);
+      lastBoardRefresh = frameNow;
+    }
+  }, CLOCK_REFRESH_MS);
 }
 
 function setStatus(msg, cls) {
