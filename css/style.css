@@ -66,6 +66,7 @@ body {
 }
 #view-routes .panel, #view-history .panel { flex: 1; }
 .editor-panel, .run-panel { max-height: 46dvh; border-top: 1px solid var(--border); }
+.run-panel { position: relative; z-index: 2101; }
 
 .panel-head {
   display: flex;
@@ -145,15 +146,21 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-.cursor-picker {
+.run-options {
+  display: flex;
+  gap: 8px 10px;
+  flex-wrap: wrap;
+  margin: 6px 0 8px;
+}
+.run-picker {
   color: var(--dim);
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  margin: 6px 0 8px;
+  margin: 0;
 }
-.cursor-picker select {
+.run-picker select {
   background: var(--panel2);
   border: 1px solid var(--border);
   color: var(--text);

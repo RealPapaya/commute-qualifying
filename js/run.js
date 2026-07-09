@@ -18,9 +18,11 @@ let onRunSaved = null;
 let cursorType = 'dot';
 let cursorLatLng = null;
 let cursorHeading = 0;
+let mapMode = 'street';
 
 const $ = id => document.getElementById(id);
 const CURSOR_TYPES = new Set(['dot', 'car', 'racecar', 'motorcycle']);
+const MAP_MODES = new Set(['street', 'track']);
 const CURSOR_TURN_THRESHOLD_M = 3;
 const VEHICLE_MODELS = {
   car: `<svg viewBox="0 0 48 48" aria-hidden="true">
@@ -65,7 +67,7 @@ export function initRun(callbacks) {
   $('btn-arm').addEventListener('click', armGps);
   $('btn-abort').addEventListener('click', () => stopSession('Aborted.'));
   $('btn-simulate').addEventListener('click', simulate);
-  $('btn-run-track-diagram').addEventListener('click', showTrackDiagram);
+  $('run-map-mode').addEventListener('change', () => setMapMode(selectedMapMode(), { resetFilters: true }));
   $('btn-run-diagram-back').addEventListener('click', hideTrackDiagram);
   $('run-diagram-filter-checkpoints').addEventListener('change', refreshTrackDiagram);
   $('run-diagram-filter-lights').addEventListener('change', refreshTrackDiagram);
@@ -77,8 +79,7 @@ export function initRun(callbacks) {
 export function openRun(r) {
   stopSession();
   route = { ...r, cum: cumulativeDistances(r.points) };
-  hideTrackDiagram();
-  $('btn-run-track-diagram').disabled = route.points.length < 2;
+  setMapMode(selectedMapMode(), { resetFilters: true });
   bests = allTimeBests(route.id, route.sectorBoundaries.length + 1, route.timingVersion);
   sessionBests = route.sectorBoundaries.map(() => null).concat([null]);
 
@@ -105,17 +106,31 @@ export function openRun(r) {
   renderBoard();
 }
 
-function showTrackDiagram() {
-  if (!route || route.points.length < 2) return;
-  resetTrackDiagramFilters();
-  refreshTrackDiagram();
-  $('run-track-diagram-overlay').hidden = false;
-  $('view-run').classList.add('diagram-mode');
+function hideTrackDiagram() {
+  setMapMode('street');
 }
 
-function hideTrackDiagram() {
-  $('run-track-diagram-overlay').hidden = true;
-  $('view-run').classList.remove('diagram-mode');
+function selectedMapMode() {
+  const value = $('run-map-mode')?.value ?? 'street';
+  return MAP_MODES.has(value) ? value : 'street';
+}
+
+function setMapMode(mode, { resetFilters = false } = {}) {
+  const requested = MAP_MODES.has(mode) ? mode : 'street';
+  const nextMode = requested === 'track' && route?.points?.length >= 2 ? 'track' : 'street';
+  mapMode = nextMode;
+
+  const picker = $('run-map-mode');
+  if (picker && picker.value !== mapMode) picker.value = mapMode;
+
+  if (mapMode === 'track') {
+    if (resetFilters) resetTrackDiagramFilters();
+    refreshTrackDiagram();
+  }
+
+  $('run-track-diagram-overlay').hidden = mapMode !== 'track';
+  $('view-run').classList.toggle('diagram-mode', mapMode === 'track');
+  if (mapMode === 'street') setTimeout(() => map?.invalidateSize(), 0);
 }
 
 function resetTrackDiagramFilters() {
@@ -381,4 +396,5 @@ function renderBoard(liveOnly = false) {
 
 export function runInvalidate() {
   map?.invalidateSize();
+  if (mapMode === 'track') refreshTrackDiagram();
 }
