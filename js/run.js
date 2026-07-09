@@ -1,8 +1,8 @@
 // Live run: GPS session (or simulator) feeding the pure timing engine,
 // wake lock, and the F1-style sector board.
-import { cumulativeDistances, pointAtDistance, haversine } from './geo.js';
+import { cumulativeDistances, pointAtDistance, haversine, projectOnRoute } from './geo.js';
 import { createRun, feedFix, elapsed, classifySector, fmtTime, fmtDelta,
-         MAX_ACCURACY_M } from './timing.js';
+         MAX_ACCURACY_M, OFF_ROUTE_M } from './timing.js';
 import { allTimeBests, saveRun, newId } from './store.js';
 import { renderTrackDiagram } from './trackDiagram.js';
 
@@ -370,6 +370,21 @@ function resetOffRouteFlag() {
   if (el) el.hidden = true;
 }
 
+// Reached only while still armed, i.e. timing.js has already declined to launch.
+// Two reasons it declines, and the driver can act on each: too far along the
+// route to be at the start, or not on the route at all (parallel street).
+function showDistanceToStart(fix) {
+  const d = fmtDistance(haversine([fix.lat, fix.lng], route.points[0]));
+  const proj = projectOnRoute([fix.lat, fix.lng], route.points, route.cum);
+  setStatus(proj && proj.offRoute <= OFF_ROUTE_M
+    ? `ARMED — 距離起點 ${d}，跨過起點自動開始計時`
+    : `ARMED — 尚未在路線上（距離起點 ${d}）`, 'armed');
+}
+
+function fmtDistance(m) {
+  return m >= 1000 ? `${(m / 1000).toFixed(2)} km` : `${Math.round(m)} m`;
+}
+
 function handleFix(fix) {
   if (!run) return;
   const ev = feedFix(run, fix);
@@ -382,6 +397,10 @@ function handleFix(fix) {
     return;
   }
   if (offRouteFlagActive) clearOffRouteFlag();
+
+  // Still armed: say how far the start line is, so "waiting" is distinguishable
+  // from "GPS is broken". The simulator drives its own status line.
+  if (run.state === 'armed' && simTimer == null) showDistanceToStart(fix);
 
   if (ev === 'start') setStatus('LIVE — lap running.', 'live');
   if (ev === 'sector') { setStatus('LIVE — lap running.', 'live'); renderBoard(); }
