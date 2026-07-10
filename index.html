@@ -75,6 +75,22 @@
         <label class="toggle"><input type="checkbox" id="snap-toggle" checked> Snap to roads</label>
       </div>
       <div id="tool-help" class="hint"></div>
+      <form id="place-route-form" class="place-route-form">
+        <div class="place-input-row">
+          <label for="place-start">起點</label>
+          <input id="place-start" class="place-input" type="search" placeholder="輸入路名、地址或地標" autocomplete="street-address">
+        </div>
+        <div id="place-via-list" class="place-via-list"></div>
+        <div class="place-input-row">
+          <label for="place-end">終點</label>
+          <input id="place-end" class="place-input" type="search" placeholder="輸入路名、地址或地標" autocomplete="street-address">
+        </div>
+        <div class="toolbar place-route-actions">
+          <button id="btn-add-via" type="button" class="btn">+ 必經點</button>
+          <button id="btn-build-place-route" class="btn primary">依地點規劃路線</button>
+        </div>
+        <p id="place-route-status" class="hint" role="status" aria-live="polite"></p>
+      </form>
       <div id="editor-tool-actions">
         <div class="toolbar editor-tool-actions" data-tool-actions="trace">
           <button id="btn-undo-wp" class="btn">↩ Undo point</button>

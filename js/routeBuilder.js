@@ -7,6 +7,7 @@ import { initLightsImport } from './lightsImport.js';
 import { renderTrackDiagram } from './trackDiagram.js';
 import { saveRoute, getRoute, newId } from './store.js';
 import { addBaseMap } from './baseMap.js';
+import { searchPlace } from './geocode.js';
 
 const OSRM = 'https://router.project-osrm.org/route/v1/driving/';
 
@@ -15,6 +16,7 @@ let routeLine, routeLineCasing, wpMarkers = [], lightMarkers = [];
 let onSaved = null;
 let buildSeq = 0; // stale-response guard for async OSRM rebuilds
 let afterRebuildHandlers = []; // hooks run once the polyline/markers are freshly redrawn
+let placeSearchSeq = 0;
 
 const TOOL_HELP = {
   trace: 'Click the map to add waypoints along your commute. Drag a point to move it, double-click a point to delete it.',
@@ -42,6 +44,11 @@ export function initEditor(callbacks) {
   document.getElementById('btn-remove-sector').addEventListener('click', () => changeSectorCount(-1));
   document.getElementById('btn-track-diagram').addEventListener('click', showTrackDiagram);
   document.getElementById('btn-diagram-back').addEventListener('click', hideTrackDiagram);
+  document.getElementById('place-route-form').addEventListener('submit', event => {
+    event.preventDefault();
+    buildRouteFromPlaces();
+  });
+  document.getElementById('btn-add-via').addEventListener('click', () => addViaInput());
   document.getElementById('diagram-filter-sector-colors').addEventListener('change', refreshTrackDiagram);
   document.getElementById('diagram-filter-checkpoints').addEventListener('change', refreshTrackDiagram);
   document.getElementById('diagram-filter-lights').addEventListener('change', refreshTrackDiagram);
@@ -71,6 +78,7 @@ export function onAfterRebuild(fn) {
 }
 
 export function openRoute(existing) {
+  placeSearchSeq += 1;
   route = existing ?? {
     id: newId(),
     name: '',
@@ -82,6 +90,7 @@ export function openRoute(existing) {
     timingVersion: 1,
   };
   document.getElementById('route-name').value = route.name;
+  resetPlaceInputs();
   document.getElementById('snap-toggle').checked = route.snap !== false;
   setTool('trace');
   hideTrackDiagram();
@@ -96,6 +105,90 @@ export function openRoute(existing) {
         () => {});
     }
   }, 50);
+}
+
+function viaInputs() {
+  return [...document.querySelectorAll('#place-via-list .place-input')];
+}
+
+function addViaInput(value = '') {
+  const row = document.createElement('div');
+  row.className = 'place-input-row';
+
+  const label = document.createElement('label');
+  label.textContent = '必經點';
+  const input = document.createElement('input');
+  input.className = 'place-input';
+  input.type = 'search';
+  input.placeholder = '輸入路名、地址或地標';
+  input.autocomplete = 'street-address';
+  input.setAttribute('aria-label', '必經地點');
+  input.value = value;
+  const remove = document.createElement('button');
+  remove.type = 'button';
+  remove.className = 'btn place-remove';
+  remove.textContent = '移除';
+  remove.addEventListener('click', () => row.remove());
+
+  row.append(label, input, remove);
+  document.getElementById('place-via-list').append(row);
+  input.focus();
+}
+
+function resetPlaceInputs() {
+  document.getElementById('place-start').value = '';
+  document.getElementById('place-end').value = '';
+  document.getElementById('place-via-list').replaceChildren();
+  setPlaceStatus('');
+  document.getElementById('btn-build-place-route').disabled = false;
+}
+
+function setPlaceStatus(message) {
+  document.getElementById('place-route-status').textContent = message;
+}
+
+async function buildRouteFromPlaces() {
+  const start = document.getElementById('place-start');
+  const end = document.getElementById('place-end');
+  const places = [
+    { label: '起點', query: start.value.trim(), input: start },
+    ...viaInputs().map((input, index) => ({
+      label: `必經點 ${index + 1}`, query: input.value.trim(), input,
+    })).filter(place => place.query),
+    { label: '終點', query: end.value.trim(), input: end },
+  ];
+  const missing = places.find(place => !place.query);
+  if (missing) {
+    setPlaceStatus(`請輸入${missing.label}。`);
+    missing.input.focus();
+    return;
+  }
+
+  const seq = ++placeSearchSeq;
+  const button = document.getElementById('btn-build-place-route');
+  button.disabled = true;
+  try {
+    const resolved = [];
+    for (const [index, place] of places.entries()) {
+      if (index) await new Promise(resolve => setTimeout(resolve, 1100));
+      setPlaceStatus(`正在尋找${place.label}（${index + 1}/${places.length}）…`);
+      resolved.push(await searchPlace(place.query));
+    }
+    if (seq !== placeSearchSeq) return;
+
+    route.waypoints = resolved.map(place => place.point);
+    await rebuildGeometry();
+    if (route.points.length > 1) {
+      map.fitBounds(L.latLngBounds(route.points), { padding: [30, 30] });
+    }
+    setPlaceStatus(`路線已建立：${resolved.map(place => place.name).join(' → ')}`);
+  } catch (error) {
+    if (seq === placeSearchSeq) {
+      setPlaceStatus(`找不到地點，請嘗試更完整的地址或改用地圖點選。${error.message}`);
+    }
+  } finally {
+    if (seq === placeSearchSeq) button.disabled = false;
+  }
 }
 
 function flashHelp(msg) {
