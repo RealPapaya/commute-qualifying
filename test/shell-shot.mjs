@@ -52,12 +52,23 @@ if (Object.values(fonts).some(v => !v)) {
 }
 
 const shot = n => page.screenshot({ path: `test/shots/shell-${n}.png` });
+const waitForMap = async hook => {
+  await page.waitForTimeout(150); // allow openRoute/openRun's deferred fitBounds
+  await page.waitForFunction(name => {
+    const map = window[name];
+    return map && Object.values(map._layers).some(layer => {
+      const glMap = layer.getMaplibreMap?.();
+      return glMap?.loaded() && glMap.areTilesLoaded();
+    });
+  }, hook, { timeout: 15000 });
+  await page.waitForTimeout(100); // let the completed WebGL frame reach the canvas
+};
 
 await page.waitForTimeout(400);
 await shot('1-routes');
 
 await page.click('#route-list [data-edit]');
-await page.waitForTimeout(1000);
+await waitForMap('_editorMap');
 await shot('2-editor');
 
 await page.click('#btn-track-diagram');
@@ -67,7 +78,7 @@ await shot('3-track-diagram');
 await page.click('#btn-diagram-back');
 
 await page.click('[data-view="run"]');
-await page.waitForTimeout(1000);
+await waitForMap('_runMap');
 await shot('4-run');
 
 await page.click('[data-view="history"]');

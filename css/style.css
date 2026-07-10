@@ -796,32 +796,28 @@ body {
 /* --- leaflet --- */
 
 .leaflet-container {
-  background: #101317;
+  background: #f7f5ef;
   font-family: 'Archivo', system-ui, sans-serif;
 }
 
-.leaflet-tile {
-  filter: grayscale(1) invert(1) brightness(0.58) contrast(1.18) saturate(0.24);
-}
-
 .leaflet-overlay-pane svg {
-  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.46));
+  filter: drop-shadow(0 3px 7px rgba(36, 59, 43, 0.18));
 }
 
 .leaflet-control-attribution {
-  background: rgba(12, 15, 18, 0.76) !important;
-  color: rgba(255, 255, 255, 0.58) !important;
+  background: rgba(255, 255, 255, 0.82) !important;
+  color: rgba(28, 38, 33, 0.62) !important;
   backdrop-filter: blur(8px);
 }
 
 .leaflet-control-attribution a {
-  color: rgba(255, 255, 255, 0.78) !important;
+  color: rgba(28, 38, 33, 0.78) !important;
 }
 
 .leaflet-control-zoom a {
-  background: rgba(12, 15, 18, 0.86) !important;
-  border-color: rgba(255, 255, 255, 0.14) !important;
-  color: #fff !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+  border-color: rgba(28, 38, 33, 0.12) !important;
+  color: #1c2621 !important;
   backdrop-filter: blur(8px);
 }
 
@@ -832,10 +828,10 @@ body {
   z-index: 700;
   display: flex;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(28, 38, 33, 0.12);
   border-radius: var(--radius);
-  background: rgba(12, 15, 18, 0.86);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.38);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 22px rgba(28, 38, 33, 0.14);
   backdrop-filter: blur(8px);
 }
 
@@ -848,9 +844,9 @@ body {
 .map-follow-zoom {
   min-height: 42px;
   border: 0;
-  border-right: 1px solid rgba(255, 255, 255, 0.14);
+  border-right: 1px solid rgba(28, 38, 33, 0.12);
   background: transparent;
-  color: rgba(255, 255, 255, 0.86);
+  color: rgba(28, 38, 33, 0.86);
   padding: 8px 12px;
   cursor: pointer;
   font-family: inherit;
@@ -882,13 +878,11 @@ body {
 .route-line-core {
   stroke-linecap: round;
   stroke-linejoin: round;
-  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.28));
+  filter: drop-shadow(0 2px 3px rgba(24, 74, 42, 0.22));
 }
 
 .route-line-run {
-  filter:
-    drop-shadow(0 0 8px rgba(255, 255, 255, 0.30))
-    drop-shadow(0 0 14px rgba(225, 6, 0, 0.28));
+  filter: drop-shadow(0 2px 3px rgba(24, 74, 42, 0.24));
 }
 
 .run-sector-marker {

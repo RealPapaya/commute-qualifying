@@ -6,6 +6,7 @@ import { createRun, feedFix, elapsed, classifySector, fmtTime, fmtDelta,
 import { allTimeBests, saveRun, newId, listRuns } from './store.js';
 import { renderTrackDiagram } from './trackDiagram.js';
 import { initSummary, showSummary } from './summary.js';
+import { addBaseMap } from './baseMap.js';
 
 let map, routeLayer = null, posMarker = null;
 let route = null;          // active route (with points/cum attached)
@@ -76,10 +77,7 @@ export function initRun(callbacks) {
   onReplanRoute = callbacks.onReplanRoute;
   map = L.map('run-map').setView([25.04, 121.53], 13);
   window._runMap = map; // test hook (e2e driver)
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; OpenStreetMap contributors',
-  }).addTo(map);
+  addBaseMap(map);
 
   $('btn-arm').addEventListener('click', armGps);
   $('btn-abort').addEventListener('click', () => stopSession('Aborted.'));
@@ -112,11 +110,11 @@ export function openRun(r) {
   if (routeLayer) routeLayer.remove();
   routeLayer = L.layerGroup().addTo(map);
   L.polyline(route.points, {
-    color: '#050608', weight: 11, opacity: 0.72, interactive: false,
+    color: '#dce6de', weight: 11, opacity: 0.9, interactive: false,
     className: 'route-line-casing',
   }).addTo(routeLayer);
   L.polyline(route.points, {
-    color: '#f7f8f8', weight: 5, opacity: 0.98,
+    color: '#237443', weight: 8, opacity: 1,
     className: 'route-line-core route-line-run',
   }).addTo(routeLayer);
   route.sectorBoundaries.forEach(d => {

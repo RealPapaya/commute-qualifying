@@ -6,6 +6,7 @@ import { initRouteDrag } from './routeDrag.js';
 import { initLightsImport } from './lightsImport.js';
 import { renderTrackDiagram } from './trackDiagram.js';
 import { saveRoute, getRoute, newId } from './store.js';
+import { addBaseMap } from './baseMap.js';
 
 const OSRM = 'https://router.project-osrm.org/route/v1/driving/';
 
@@ -25,10 +26,7 @@ export function initEditor(callbacks) {
   onSaved = callbacks.onSaved;
   map = L.map('editor-map').setView([25.04, 121.53], 13);
   window._editorMap = map; // test hook (e2e driver)
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; OpenStreetMap contributors',
-  }).addTo(map);
+  addBaseMap(map);
 
   map.on('click', onMapClick);
 
@@ -229,11 +227,11 @@ function redrawLine() {
   routeLine = null;
   if (route.points.length > 1) {
     routeLineCasing = L.polyline(route.points, {
-      color: '#050608', weight: 11, opacity: 0.72, interactive: false,
+      color: '#dce6de', weight: 11, opacity: 0.9, interactive: false,
       className: 'route-line-casing',
     }).addTo(map);
     routeLine = L.polyline(route.points, {
-      color: '#f7f8f8', weight: 5, opacity: 0.98,
+      color: '#237443', weight: 8, opacity: 1,
       className: 'route-line-core route-line-editor',
     }).addTo(map);
   }
