@@ -14,6 +14,17 @@ export function parsePlace(results) {
   return { point, name: result.display_name || '已選取地點' };
 }
 
+export function parsePlaces(results) {
+  return (results ?? []).flatMap(result => {
+    const point = [Number(result.lat), Number(result.lon)];
+    if (!Number.isFinite(point[0]) || !Number.isFinite(point[1]) ||
+      point[0] < -90 || point[0] > 90 || point[1] < -180 || point[1] > 180) {
+      return [];
+    }
+    return [{ point, name: result.display_name || '搜尋結果' }];
+  });
+}
+
 export async function searchPlace(query, fetcher = fetch) {
   const term = query.trim();
   if (!term) throw new Error('請輸入地點。');
@@ -29,4 +40,21 @@ export async function searchPlace(query, fetcher = fetch) {
   });
   if (!response.ok) throw new Error('地點搜尋服務暫時無法使用。');
   return parsePlace(await response.json());
+}
+
+export async function searchPlaces(query, fetcher = fetch) {
+  const term = query.trim();
+  if (!term) throw new Error('請輸入地點名稱');
+
+  const params = new URLSearchParams({
+    format: 'jsonv2',
+    limit: '5',
+    'accept-language': 'zh-TW',
+    q: term,
+  });
+  const response = await fetcher(`${NOMINATIM}?${params}`, {
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!response.ok) throw new Error('地點搜尋暫時無法使用');
+  return parsePlaces(await response.json());
 }

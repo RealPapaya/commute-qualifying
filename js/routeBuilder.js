@@ -7,7 +7,7 @@ import { initLightsImport } from './lightsImport.js';
 import { renderTrackDiagram } from './trackDiagram.js';
 import { saveRoute, getRoute, newId } from './store.js';
 import { addBaseMap } from './baseMap.js';
-import { searchPlace } from './geocode.js';
+import { searchPlace, searchPlaces } from './geocode.js';
 import { acceptedRecordingPoint } from './gpsRouteRecorder.js';
 
 const OSRM = 'https://router.project-osrm.org/route/v1/driving/';
@@ -18,6 +18,8 @@ let onSaved = null;
 let buildSeq = 0; // stale-response guard for async OSRM rebuilds
 let afterRebuildHandlers = []; // hooks run once the polyline/markers are freshly redrawn
 let placeSearchSeq = 0;
+let placeSuggestionId = 0;
+const selectedPlaces = new WeakMap();
 let recordingWatchId = null, recordingMarker = null;
 let recordingMode = false, lastRecordingPoint = null;
 
@@ -53,6 +55,8 @@ export function initEditor(callbacks) {
   document.getElementById('btn-stop-gps-recording').addEventListener('click', stopGpsRecording);
   document.getElementById('btn-record-checkpoint').addEventListener('click', addRecordedCheckpoint);
   document.getElementById('btn-record-light').addEventListener('click', addRecordedLight);
+  setupPlaceAutocomplete(document.getElementById('place-start'));
+  setupPlaceAutocomplete(document.getElementById('place-end'));
   document.getElementById('place-route-form').addEventListener('submit', event => {
     event.preventDefault();
     buildRouteFromPlaces();
@@ -145,20 +149,28 @@ function addViaInput(value = '') {
   input.autocomplete = 'street-address';
   input.setAttribute('aria-label', '必經地點');
   input.value = value;
+  const inputWrap = document.createElement('div');
+  inputWrap.className = 'place-input-wrap';
+  inputWrap.append(input);
+  setupPlaceAutocomplete(input, inputWrap);
   const remove = document.createElement('button');
   remove.type = 'button';
   remove.className = 'btn place-remove';
   remove.textContent = '移除';
   remove.addEventListener('click', () => row.remove());
 
-  row.append(label, input, remove);
+  row.append(label, inputWrap, remove);
   document.getElementById('place-via-list').append(row);
   input.focus();
 }
 
 function resetPlaceInputs() {
-  document.getElementById('place-start').value = '';
-  document.getElementById('place-end').value = '';
+  const start = document.getElementById('place-start');
+  const end = document.getElementById('place-end');
+  start.value = '';
+  end.value = '';
+  selectedPlaces.delete(start);
+  selectedPlaces.delete(end);
   document.getElementById('place-via-list').replaceChildren();
   setPlaceStatus('');
   document.getElementById('btn-build-place-route').disabled = false;
@@ -166,6 +178,77 @@ function resetPlaceInputs() {
 
 function setPlaceStatus(message) {
   document.getElementById('place-route-status').textContent = message;
+}
+
+function setupPlaceAutocomplete(input, inputWrap = input.parentElement) {
+  if (!inputWrap.classList.contains('place-input-wrap')) {
+    const wrap = document.createElement('div');
+    wrap.className = 'place-input-wrap';
+    input.before(wrap);
+    wrap.append(input);
+    inputWrap = wrap;
+  }
+
+  const suggestions = document.createElement('ul');
+  suggestions.className = 'place-suggestions';
+  suggestions.id = `place-suggestions-${++placeSuggestionId}`;
+  suggestions.setAttribute('role', 'listbox');
+  suggestions.setAttribute('aria-label', '地點建議');
+  suggestions.hidden = true;
+  inputWrap.append(suggestions);
+  input.setAttribute('role', 'combobox');
+  input.setAttribute('aria-autocomplete', 'list');
+  input.setAttribute('aria-controls', suggestions.id);
+
+  let searchSeq = 0;
+  let timer = null;
+  const hide = () => {
+    suggestions.replaceChildren();
+    suggestions.hidden = true;
+    input.setAttribute('aria-expanded', 'false');
+  };
+  const show = places => {
+    suggestions.replaceChildren(...places.map(place => {
+      const item = document.createElement('li');
+      const option = document.createElement('button');
+      option.type = 'button';
+      option.className = 'place-suggestion';
+      option.setAttribute('role', 'option');
+      option.textContent = place.name;
+      option.addEventListener('click', () => {
+        input.value = place.name;
+        selectedPlaces.set(input, place);
+        hide();
+      });
+      item.append(option);
+      return item;
+    }));
+    suggestions.hidden = false;
+    input.setAttribute('aria-expanded', 'true');
+  };
+
+  input.addEventListener('input', () => {
+    selectedPlaces.delete(input);
+    clearTimeout(timer);
+    hide();
+    const query = input.value.trim();
+    if (query.length < 2) return;
+    const seq = ++searchSeq;
+    timer = setTimeout(async () => {
+      try {
+        const places = await searchPlaces(query);
+        if (seq === searchSeq && input.value.trim() === query && places.length) show(places);
+      } catch {
+        if (seq === searchSeq) hide();
+      }
+    }, 250);
+  });
+  input.addEventListener('keydown', event => {
+    if (event.key === 'Escape') hide();
+  });
+  document.addEventListener('pointerdown', event => {
+    if (!inputWrap.contains(event.target)) hide();
+  });
 }
 
 async function buildRouteFromPlaces() {
@@ -178,6 +261,7 @@ async function buildRouteFromPlaces() {
     })).filter(place => place.query),
     { label: '終點', query: end.value.trim(), input: end },
   ];
+  places.forEach(place => { place.selected = selectedPlaces.get(place.input); });
   const missing = places.find(place => !place.query);
   if (missing) {
     setPlaceStatus(`請輸入${missing.label}。`);
@@ -191,9 +275,9 @@ async function buildRouteFromPlaces() {
   try {
     const resolved = [];
     for (const [index, place] of places.entries()) {
-      if (index) await new Promise(resolve => setTimeout(resolve, 1100));
+      if (index && !place.selected) await new Promise(resolve => setTimeout(resolve, 1100));
       setPlaceStatus(`正在尋找${place.label}（${index + 1}/${places.length}）…`);
-      resolved.push(await searchPlace(place.query));
+      resolved.push(place.selected ?? await searchPlace(place.query));
     }
     if (seq !== placeSearchSeq) return;
 

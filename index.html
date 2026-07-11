@@ -17,29 +17,36 @@
 <body>
   <header id="topbar">
     <h1><span class="eyebrow">COMMUTE</span><span class="title">QUALIFYING</span></h1>
+    <label class="run-picker language-picker">
+      <span data-i18n="language">Language</span>
+      <select id="language-select" aria-label="Language" data-i18n-aria-label="language">
+        <option value="zh" data-i18n="chinese">中文</option>
+        <option value="en" data-i18n="english">English</option>
+      </select>
+    </label>
   </header>
 
   <!-- Bottom nav. Icon-only, as in the reference; the accessible name carries
        the label. app.js keys off data-view, never the text. -->
   <nav id="tabs">
-    <button data-view="routes" class="tab active" aria-label="Routes" title="Routes">
+    <button data-view="routes" class="tab active" aria-label="Routes" title="Routes" data-i18n-aria-label="navRoutes" data-i18n-title="navRoutes">
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M7 21V4"/><path d="M7 5h10l-3 3.5L17 12H7z"/>
       </svg>
     </button>
-    <button data-view="editor" class="tab" disabled aria-label="Editor" title="Editor">
+    <button data-view="editor" class="tab" disabled aria-label="Editor" title="Editor" data-i18n-aria-label="navEditor" data-i18n-title="navEditor">
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M4.5 19.5h3.2L19 8.2a2.2 2.2 0 0 0-3.2-3.2L4.5 16.3z"/><path d="M15 6l3 3"/>
       </svg>
     </button>
-    <button data-view="run" class="tab" disabled aria-label="Run" title="Run">
+    <button data-view="run" class="tab" disabled aria-label="Run" title="Run" data-i18n-aria-label="navRun" data-i18n-title="navRun">
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M3.6 15a8.4 8.4 0 0 1 16.8 0"/>
         <path d="M3.6 15h16.8v1.6a1.6 1.6 0 0 1-1.6 1.6H5.2a1.6 1.6 0 0 1-1.6-1.6z"/>
         <path d="M9.6 15a5.4 5.4 0 0 1 4.9-5.4"/>
       </svg>
     </button>
-    <button data-view="history" class="tab" aria-label="History" title="History">
+    <button data-view="history" class="tab" aria-label="History" title="History" data-i18n-aria-label="navHistory" data-i18n-title="navHistory">
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M7.2 4h9.6v4.6a4.8 4.8 0 0 1-9.6 0z"/>
         <path d="M7.2 5.6H5a2.2 2.2 0 0 0 2.4 4"/><path d="M16.8 5.6H19a2.2 2.2 0 0 1-2.4 4"/>
@@ -52,19 +59,19 @@
   <section id="view-routes" class="view active">
     <div class="panel">
       <div class="panel-head">
-        <h2>My Routes</h2>
-        <button id="btn-new-route" class="btn primary" aria-expanded="false">+ New Route</button>
+        <h2 data-i18n="myRoutes">My Routes</h2>
+        <button id="btn-new-route" class="btn primary" aria-expanded="false" data-i18n="newRoute">+ New Route</button>
       </div>
       <div id="new-route-options" class="new-route-options" hidden>
         <button class="new-route-choice" data-new-route-mode="plan">
-          <strong>Plan ahead</strong><span>Trace on the map or build from places</span>
+          <strong data-i18n="planAhead">Plan ahead</strong><span data-i18n="planAheadDesc">Trace on the map or build from places</span>
         </button>
         <button class="new-route-choice" data-new-route-mode="record">
-          <strong>GPS record</strong><span>Drive the route and mark it live</span>
+          <strong data-i18n="gpsRecord">GPS record</strong><span data-i18n="gpsRecordDesc">Drive the route and mark it live</span>
         </button>
       </div>
       <ul id="route-list" class="route-list"></ul>
-      <p class="hint" id="routes-empty">No routes yet. Create one, then trace your commute on the map.</p>
+      <p class="hint" id="routes-empty" data-i18n="routesEmpty">No routes yet. Create one, then trace your commute on the map.</p>
     </div>
   </section>
 
@@ -73,72 +80,72 @@
     <div id="editor-map" class="map"></div>
     <div class="panel editor-panel">
       <div class="panel-head">
-        <input id="route-name" class="name-input" placeholder="Route name" maxlength="40">
+        <input id="route-name" class="name-input" placeholder="Route name" maxlength="40" data-i18n-placeholder="routeName">
         <span id="route-stats" class="stats"></span>
       </div>
       <div class="toolbar" id="editor-toolbar">
-        <button data-tool="trace" class="btn tool active" title="Click map to add waypoints">✏️ Trace</button>
-        <button data-tool="light" class="btn tool" title="Click route to mark a traffic light">🚦 Lights</button>
-        <button data-tool="sector" class="btn tool" title="Drag sector boundaries along the route">⏱ Sectors</button>
-        <label class="toggle"><input type="checkbox" id="snap-toggle" checked> Snap to roads</label>
-        <label class="toggle"><input type="checkbox" id="closed-loop-toggle"> 閉環賽道（可連續多圈）</label>
+        <button data-tool="trace" class="btn tool active" title="Click map to add waypoints" data-i18n="trace" data-i18n-title="traceTitle">✏️ Trace</button>
+        <button data-tool="light" class="btn tool" title="Click route to mark a traffic light" data-i18n="lights" data-i18n-title="lightsTitle">🚦 Lights</button>
+        <button data-tool="sector" class="btn tool" title="Drag sector boundaries along the route" data-i18n="sectors" data-i18n-title="sectorsTitle">⏱ Sectors</button>
+        <label class="toggle"><input type="checkbox" id="snap-toggle" checked><span data-i18n="snapToRoads">Snap to roads</span></label>
+        <label class="toggle"><input type="checkbox" id="closed-loop-toggle"><span data-i18n="closedLoop">閉環賽道（可連續多圈）</span></label>
       </div>
       <div id="tool-help" class="hint"></div>
-      <section id="gps-recording-panel" class="gps-recording-panel" hidden aria-label="GPS route recording">
-        <p class="gps-recording-copy">Record the route from your current GPS position. Add markers while recording, then stop and save.</p>
+      <section id="gps-recording-panel" class="gps-recording-panel" hidden aria-label="GPS route recording" data-i18n-aria-label="gpsRecording">
+        <p class="gps-recording-copy" data-i18n="gpsRecordingCopy">Record the route from your current GPS position. Add markers while recording, then stop and save.</p>
         <div class="toolbar gps-recording-actions">
-          <button id="btn-start-gps-recording" class="btn primary">Start GPS recording</button>
-          <button id="btn-stop-gps-recording" class="btn" hidden>Stop recording</button>
+          <button id="btn-start-gps-recording" class="btn primary" data-i18n="startGps">Start GPS recording</button>
+          <button id="btn-stop-gps-recording" class="btn" hidden data-i18n="stopGps">Stop recording</button>
         </div>
         <div class="toolbar gps-marker-actions">
-          <button id="btn-record-checkpoint" class="btn" disabled>+ Checkpoint</button>
-          <button id="btn-record-light" class="btn" disabled>+ Light</button>
+          <button id="btn-record-checkpoint" class="btn" disabled data-i18n="checkpoint">+ Checkpoint</button>
+          <button id="btn-record-light" class="btn" disabled data-i18n="light">+ Light</button>
         </div>
-        <p id="gps-recording-status" class="hint" role="status" aria-live="polite">Ready to record.</p>
+        <p id="gps-recording-status" class="hint" role="status" aria-live="polite" data-i18n="readyRecord">Ready to record.</p>
       </section>
       <form id="place-route-form" class="place-route-form">
         <div class="place-input-row">
-          <label for="place-start">起點</label>
-          <input id="place-start" class="place-input" type="search" placeholder="輸入路名、地址或地標" autocomplete="street-address">
+          <label for="place-start" data-i18n="start">起點</label>
+          <input id="place-start" class="place-input" type="search" placeholder="輸入路名、地址或地標" autocomplete="street-address" data-i18n-placeholder="placePlaceholder">
         </div>
         <div id="place-via-list" class="place-via-list"></div>
         <div class="place-input-row">
-          <label for="place-end">終點</label>
-          <input id="place-end" class="place-input" type="search" placeholder="輸入路名、地址或地標" autocomplete="street-address">
+          <label for="place-end" data-i18n="end">終點</label>
+          <input id="place-end" class="place-input" type="search" placeholder="輸入路名、地址或地標" autocomplete="street-address" data-i18n-placeholder="placePlaceholder">
         </div>
         <div class="toolbar place-route-actions">
-          <button id="btn-add-via" type="button" class="btn">+ 必經點</button>
-          <button id="btn-build-place-route" class="btn primary">依地點規劃路線</button>
+          <button id="btn-add-via" type="button" class="btn" data-i18n="addVia">+ 必經點</button>
+          <button id="btn-build-place-route" class="btn primary" data-i18n="buildRoute">依地點規劃路線</button>
         </div>
         <p id="place-route-status" class="hint" role="status" aria-live="polite"></p>
       </form>
       <div id="editor-tool-actions">
         <div class="toolbar editor-tool-actions" data-tool-actions="trace">
-          <button id="btn-undo-wp" class="btn">↩ Undo point</button>
-          <button id="btn-clear-route" class="btn danger">Clear trace</button>
+          <button id="btn-undo-wp" class="btn" data-i18n="undo">↩ Undo point</button>
+          <button id="btn-clear-route" class="btn danger" data-i18n="clearTrace">Clear trace</button>
         </div>
         <div class="toolbar editor-tool-actions" data-tool-actions="light" hidden>
-          <button id="btn-clear-lights" class="btn danger">Clear lights</button>
+          <button id="btn-clear-lights" class="btn danger" data-i18n="clearLights">Clear lights</button>
         </div>
         <div class="toolbar editor-tool-actions" data-tool-actions="sector" hidden>
-          <button id="btn-add-sector" class="btn">+ Sector</button>
-          <button id="btn-remove-sector" class="btn">− Sector</button>
+          <button id="btn-add-sector" class="btn" data-i18n="addSector">+ Sector</button>
+          <button id="btn-remove-sector" class="btn" data-i18n="removeSector">− Sector</button>
         </div>
       </div>
       <div class="toolbar editor-route-actions">
-        <button id="btn-track-diagram" class="btn" disabled title="Show F1-style circuit diagram">🏁 賽道圖</button>
-        <button id="btn-save-route" class="btn primary">Save</button>
+        <button id="btn-track-diagram" class="btn" disabled title="Show F1-style circuit diagram" data-i18n="trackDiagram" data-i18n-title="trackDiagramTitle">🏁 賽道圖</button>
+        <button id="btn-save-route" class="btn primary" data-i18n="save">Save</button>
       </div>
       <div id="sector-summary" class="sector-summary"></div>
     </div>
     <div id="track-diagram-overlay" class="track-diagram-overlay" hidden>
       <div class="track-diagram-head">
-        <button id="btn-diagram-back" class="btn">返回編輯</button>
-        <div class="track-diagram-title">賽道圖模式</div>
-        <div class="track-diagram-filters" aria-label="賽道圖篩選">
-          <label class="toggle"><input type="checkbox" id="diagram-filter-sector-colors" checked> Sector colors</label>
-          <label class="toggle"><input type="checkbox" id="diagram-filter-checkpoints" checked> Sector checkpoints</label>
-          <label class="toggle"><input type="checkbox" id="diagram-filter-lights"> Traffic lights</label>
+        <button id="btn-diagram-back" class="btn" data-i18n="backEditor">返回編輯</button>
+        <div class="track-diagram-title" data-i18n="trackDiagramMode">賽道圖模式</div>
+        <div class="track-diagram-filters" aria-label="賽道圖篩選" data-i18n-aria-label="trackDiagramFilters">
+          <label class="toggle"><input type="checkbox" id="diagram-filter-sector-colors" checked><span data-i18n="sectorColors">Sector colors</span></label>
+          <label class="toggle"><input type="checkbox" id="diagram-filter-checkpoints" checked><span data-i18n="sectorCheckpoints">Sector checkpoints</span></label>
+          <label class="toggle"><input type="checkbox" id="diagram-filter-lights"><span data-i18n="trafficLights">Traffic lights</span></label>
         </div>
       </div>
       <div id="track-diagram-svg" class="track-diagram-svg"></div>
@@ -148,58 +155,58 @@
   <!-- Run -->
   <section id="view-run" class="view">
     <div id="run-map" class="map">
-      <div class="map-follow-controls" aria-label="跟隨位置控制">
-        <button id="btn-follow-zoom-out" class="map-follow-zoom" type="button" title="縮小" disabled>−</button>
-        <button id="btn-follow-user" class="map-follow-btn" type="button" aria-pressed="false" title="放大並跟隨位置">⌖ 跟隨</button>
-        <button id="btn-follow-zoom-in" class="map-follow-zoom" type="button" title="放大" disabled>+</button>
+      <div class="map-follow-controls" aria-label="跟隨位置控制" data-i18n-aria-label="followControls">
+        <button id="btn-follow-zoom-out" class="map-follow-zoom" type="button" title="縮小" disabled data-i18n-title="zoomOut">−</button>
+        <button id="btn-follow-user" class="map-follow-btn" type="button" aria-pressed="false" title="放大並跟隨位置" data-i18n="follow" data-i18n-title="followTitle">⌖ 跟隨</button>
+        <button id="btn-follow-zoom-in" class="map-follow-zoom" type="button" title="放大" disabled data-i18n-title="zoomIn">+</button>
       </div>
       <div id="run-track-diagram-overlay" class="track-diagram-overlay" hidden>
         <div class="track-diagram-head">
-          <button id="btn-run-diagram-back" class="btn">返回 Run</button>
-          <div class="track-diagram-title">賽道圖模式</div>
-          <div class="track-diagram-filters" aria-label="Run 賽道圖篩選">
-            <label class="toggle"><input type="checkbox" id="run-diagram-filter-sector-colors" checked> Sector colors</label>
-            <label class="toggle"><input type="checkbox" id="run-diagram-filter-checkpoints" checked> Sector checkpoints</label>
-            <label class="toggle"><input type="checkbox" id="run-diagram-filter-lights"> Traffic lights</label>
+          <button id="btn-run-diagram-back" class="btn" data-i18n="backRun">返回 Run</button>
+          <div class="track-diagram-title" data-i18n="trackDiagramMode">賽道圖模式</div>
+          <div class="track-diagram-filters" aria-label="Run 賽道圖篩選" data-i18n-aria-label="runTrackFilters">
+            <label class="toggle"><input type="checkbox" id="run-diagram-filter-sector-colors" checked><span data-i18n="sectorColors">Sector colors</span></label>
+            <label class="toggle"><input type="checkbox" id="run-diagram-filter-checkpoints" checked><span data-i18n="sectorCheckpoints">Sector checkpoints</span></label>
+            <label class="toggle"><input type="checkbox" id="run-diagram-filter-lights"><span data-i18n="trafficLights">Traffic lights</span></label>
           </div>
         </div>
         <div id="run-track-diagram-svg" class="track-diagram-svg"></div>
       </div>
     </div>
     <div class="panel run-panel">
-      <div id="run-status" class="run-status">Press ARM, then drive. Timing starts when you cross the start line.</div>
+      <div id="run-status" class="run-status" data-i18n="runStatus">Press ARM, then drive. Timing starts when you cross the start line.</div>
       <div id="offroute-flag" class="offroute-flag" role="alertdialog" aria-live="assertive" aria-labelledby="offroute-title" hidden>
-        <div id="offroute-title" class="offroute-title">YELLOW FLAG — off route</div>
-        <div class="offroute-copy">你已經脫離 trace。可以重新規劃路線，或等待 GPS 回到軌道後繼續。</div>
+        <div id="offroute-title" class="offroute-title" data-i18n="offRoute">YELLOW FLAG — off route</div>
+        <div class="offroute-copy" data-i18n="offRouteCopy">你已經脫離 trace。可以重新規劃路線，或等待 GPS 回到軌道後繼續。</div>
         <div class="toolbar offroute-actions">
-          <button id="btn-replan-route" class="btn">重新規劃路線</button>
-          <button id="btn-wait-track" class="btn primary">等待回到軌道</button>
+          <button id="btn-replan-route" class="btn" data-i18n="replan">重新規劃路線</button>
+          <button id="btn-wait-track" class="btn primary" data-i18n="waitTrack">等待回到軌道</button>
         </div>
       </div>
       <div id="run-clock" class="run-clock">--:--:---</div>
       <div id="sector-board" class="sector-board"></div>
       <div class="run-options">
         <label class="run-picker">
-          Map mode
+          <span data-i18n="mapMode">Map mode</span>
           <select id="run-map-mode">
-            <option value="street">Street map</option>
-            <option value="track">Track diagram</option>
+            <option value="street" data-i18n="streetMap">Street map</option>
+            <option value="track" data-i18n="trackDiagramMode">Track diagram</option>
           </select>
         </label>
         <label class="run-picker cursor-picker">
-          游標
+          <span data-i18n="cursor">游標</span>
           <select id="run-cursor-type">
-            <option value="dot">圓點</option>
-            <option value="car">汽車 3D</option>
-            <option value="racecar">跑車 3D</option>
-            <option value="motorcycle">機車 3D</option>
+            <option value="dot" data-i18n="cursorDot">圓點</option>
+            <option value="car" data-i18n="cursorCar">汽車 3D</option>
+            <option value="racecar" data-i18n="cursorRacecar">跑車 3D</option>
+            <option value="motorcycle" data-i18n="cursorMotorcycle">機車 3D</option>
           </select>
         </label>
       </div>
       <div class="toolbar">
-        <button id="btn-arm" class="btn primary big">ARM GPS</button>
-        <button id="btn-abort" class="btn danger" hidden>Abort</button>
-        <button id="btn-simulate" class="btn">▶ Simulate run</button>
+        <button id="btn-arm" class="btn primary big" data-i18n="armGps">ARM GPS</button>
+        <button id="btn-abort" class="btn danger" hidden data-i18n="abort">Abort</button>
+        <button id="btn-simulate" class="btn" data-i18n="simulate">▶ Simulate run</button>
       </div>
       <div id="gps-info" class="hint"></div>
     </div>
@@ -208,16 +215,16 @@
   <!-- History -->
   <section id="view-history" class="view">
     <div class="panel">
-      <div class="panel-head"><h2>Run History &amp; Personal Bests</h2></div>
+      <div class="panel-head"><h2 data-i18n="history">Run History &amp; Personal Bests</h2></div>
       <div id="best-board"></div>
       <ul id="run-history" class="run-list"></ul>
-      <p class="hint" id="history-empty">No completed runs yet.</p>
+      <p class="hint" id="history-empty" data-i18n="historyEmpty">No completed runs yet.</p>
     </div>
   </section>
 
   <!-- Post-run summary card -->
   <div id="summary-overlay" class="summary-overlay" hidden>
-    <button class="f1c-close" type="button" aria-label="Close summary">✕</button>
+    <button class="f1c-close" type="button" aria-label="Close summary" data-i18n-aria-label="closeSummary">✕</button>
     <div class="f1c-host"></div>
   </div>
 
@@ -225,6 +232,7 @@
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
   <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.1.3/leaflet-maplibre-gl.js"></script>
+  <script type="module" src="js/i18n.js"></script>
   <script type="module" src="js/app.js"></script>
 </body>
 </html>

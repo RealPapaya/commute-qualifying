@@ -894,6 +894,55 @@ body {
   font-size: 13px;
 }
 
+.place-input-wrap {
+  position: relative;
+  min-width: 0;
+}
+
+.place-suggestions {
+  position: absolute;
+  z-index: 1200;
+  top: calc(100% + 3px);
+  right: 0;
+  left: 0;
+  max-height: 180px;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+}
+
+.place-suggestions[hidden] {
+  display: none;
+}
+
+.place-suggestion {
+  display: block;
+  width: 100%;
+  padding: 9px;
+  border: 0;
+  border-bottom: 1px solid var(--hairline);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: left;
+}
+
+.place-suggestions li:last-child .place-suggestion {
+  border-bottom: 0;
+}
+
+.place-suggestion:hover,
+.place-suggestion:focus-visible {
+  background: var(--surface2);
+  outline: 0;
+}
+
 .place-via-list {
   display: grid;
   gap: 7px;

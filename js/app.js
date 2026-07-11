@@ -6,6 +6,7 @@ import { initRun, openRun, runInvalidate } from './run.js';
 import { showSummary } from './summary.js';
 import { fmtTime } from './timing.js';
 import { cumulativeDistances } from './geo.js';
+import { translate as t } from './i18n.js';
 
 const $ = id => document.getElementById(id);
 let activeRouteId = null;
@@ -75,6 +76,11 @@ function createNewRoute(creationMode) {
   showView('editor');
 }
 
+document.addEventListener('languagechange', () => {
+  if (document.querySelector('#view-routes.active')) renderRouteList();
+  if (document.querySelector('#view-history.active')) renderHistory();
+});
+
 function enableTabs(editor, run) {
   document.querySelector('[data-view="editor"]').disabled = !editor;
   document.querySelector('[data-view="run"]').disabled = !run;
@@ -90,12 +96,12 @@ function renderRouteList() {
     return `<li>
       <div>
         <div>${esc(r.name)}</div>
-        <div class="meta">${km} km · ${r.sectorBoundaries.length + 1} sectors · ${r.lights.length} 🚦
+        <div class="meta">${km} km · ${r.sectorBoundaries.length + 1} ${t('sectorCount')} · ${r.lights.length} ${t('lightCount')}
           · PB ${fmtTime(best.total)}</div>
       </div>
       <div class="actions">
-        <button class="btn primary" data-run="${r.id}">Run</button>
-        <button class="btn" data-edit="${r.id}">Edit</button>
+        <button class="btn primary" data-run="${r.id}">${t('run')}</button>
+        <button class="btn" data-edit="${r.id}">${t('edit')}</button>
         <button class="btn danger" data-del="${r.id}">✕</button>
       </div>
     </li>`;
@@ -107,7 +113,7 @@ function renderRouteList() {
     b.addEventListener('click', () => editRoute(b.dataset.edit)));
   $('route-list').querySelectorAll('[data-del]').forEach(b =>
     b.addEventListener('click', () => {
-      if (!confirm('Delete this route and all its runs?')) return;
+      if (!confirm(t('deleteRouteConfirm'))) return;
       deleteRoute(b.dataset.del);
       if (b.dataset.del === activeRouteId) {
         activeRouteId = null;
@@ -145,7 +151,7 @@ function renderHistory() {
     ).join('');
     return `<h3 style="margin:8px 0 6px;font-size:13px">${esc(r.name)}</h3>
       <div class="best-grid">${cells}
-        <div class="best-cell"><div class="v">${fmtTime(best.total)}</div><div class="k">Lap</div></div>
+        <div class="best-cell"><div class="v">${fmtTime(best.total)}</div><div class="k">${t('lap')}</div></div>
       </div>`;
   }).join('');
 
@@ -154,12 +160,12 @@ function renderHistory() {
     const d = new Date(run.date);
     const sectors = run.sectorTimes.map((t, i) => `S${i + 1} ${fmtTime(t)}`).join(' · ');
     const summaryButton = route
-      ? `<button class="btn primary" data-summaryrun="${run.id}">Summary</button>`
+      ? `<button class="btn primary" data-summaryrun="${run.id}">${t('summary')}</button>`
       : '';
     return `<li>
       <div>
-        <div>${esc(route?.name ?? '(deleted route)')} — <strong>${fmtTime(run.totalTime)}</strong>
-          ${run.simulated ? '<span class="meta">(sim)</span>' : ''}</div>
+        <div>${esc(route?.name ?? t('deletedRoute'))} — <strong>${fmtTime(run.totalTime)}</strong>
+          ${run.simulated ? `<span class="meta">${t('simulated')}</span>` : ''}</div>
         <div class="meta">${d.toLocaleString()} · ${sectors}</div>
       </div>
       <div class="actions">
