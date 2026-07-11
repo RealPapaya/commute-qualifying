@@ -8,8 +8,9 @@ export const OFF_ROUTE_M = 60;        // reject fixes farther than this from rou
 export const START_RADIUS_M = 40;     // must be near start line to trigger launch
 export const BACKWARDS_TOLERANCE_M = 25; // GPS jitter may step back this much
 export const MAX_ACCURACY_M = 40;     // callers should drop fixes worse than this
+const LOOP_WRAP_RADIUS_M = START_RADIUS_M + BACKWARDS_TOLERANCE_M;
 
-// states: 'armed' -> 'running' -> 'finished'
+// states: 'armed' -> 'running' -> 'finished' (or continuously 'running' for a closed circuit)
 export function createRun(route) {
   const { points, cum, sectorBoundaries } = route; // boundaries: meters, ascending, exclusive of 0 and total
   const total = cum[cum.length - 1];
@@ -17,17 +18,20 @@ export function createRun(route) {
   const ends = [...sectorBoundaries, total];
   return {
     points, cum, total, ends,
+    closedLoop: route.closedLoop === true,
     state: 'armed',
     startTime: null,
     lastFix: null,          // { t (ms), progress }
     maxProgress: 0,
     crossings: [],          // ms timestamps when each sector end was crossed
     sectorTimes: ends.map(() => null),
+    lapCount: 0,
+    completedLap: null,
   };
 }
 
 // Feed one fix: { lat, lng, t (epoch ms) }. Returns an event string or null:
-// 'start' | 'sector' | 'finish' | 'offroute' | null.
+// 'start' | 'sector' | 'lap' | 'finish' | 'offroute' | null.
 export function feedFix(run, fix) {
   if (run.state === 'finished') return null;
   // duplicate or out-of-order timestamps would corrupt interpolation
@@ -42,7 +46,19 @@ export function feedFix(run, fix) {
   if (run.state === 'running' && (!proj || proj.offRoute > OFF_ROUTE_M)) {
     const full = projectOnRoute([fix.lat, fix.lng], run.points, run.cum);
     if (full && full.offRoute <= OFF_ROUTE_M &&
-        full.progress >= run.maxProgress - BACKWARDS_TOLERANCE_M) {
+        (full.progress >= run.maxProgress - BACKWARDS_TOLERANCE_M ||
+         isLoopWrap(run, full.progress))) {
+      proj = full;
+    }
+  }
+  // Near a closed circuit's shared start/finish location, the windowed search
+  // can still prefer the old lap's final segment. Let the unwindowed result
+  // select the first segment when it clearly represents the next lap.
+  if (run.state === 'running' && run.closedLoop && proj &&
+      run.maxProgress > run.total - LOOP_WRAP_RADIUS_M &&
+      proj.progress > run.total - LOOP_WRAP_RADIUS_M) {
+    const full = projectOnRoute([fix.lat, fix.lng], run.points, run.cum);
+    if (full && full.offRoute <= OFF_ROUTE_M && isLoopWrap(run, full.progress)) {
       proj = full;
     }
   }
@@ -65,29 +81,53 @@ export function feedFix(run, fix) {
   // running
   const prev = run.lastFix;
   const progress = proj.progress;
-  if (progress < run.maxProgress - BACKWARDS_TOLERANCE_M) {
+  const wrapped = isLoopWrap(run, progress);
+  if (progress < run.maxProgress - BACKWARDS_TOLERANCE_M && !wrapped) {
     // jitter or wrong projection; ignore this fix
     return null;
   }
-  const effective = Math.max(progress, run.maxProgress);
+  const effective = wrapped ? run.total : Math.max(progress, run.maxProgress);
+  const current = { t: fix.t, progress: wrapped ? run.total + progress : progress };
 
   let event = null;
   // check boundary crossings between prev.progress and current progress
   while (run.crossings.length < run.ends.length &&
          effective >= run.ends[run.crossings.length]) {
     const bd = run.ends[run.crossings.length];
-    const tCross = interpolateTime(prev, { t: fix.t, progress }, bd);
+    const tCross = interpolateTime(prev, current, bd);
     run.crossings.push(tCross);
     const i = run.crossings.length - 1;
     const sectorStart = i === 0 ? run.startTime : run.crossings[i - 1];
     run.sectorTimes[i] = tCross - sectorStart;
-    event = i === run.ends.length - 1 ? 'finish' : 'sector';
+    event = i === run.ends.length - 1 ? (run.closedLoop ? 'lap' : 'finish') : 'sector';
+    if (event === 'lap') {
+      run.completedLap = {
+        number: ++run.lapCount,
+        sectorTimes: [...run.sectorTimes],
+        totalTime: tCross - run.startTime,
+      };
+      // Start the next lap from the same interpolated start/finish crossing.
+      // The next GPS fix is projected near zero rather than being rejected as
+      // a backwards jump from the end of the previous lap.
+      run.startTime = tCross;
+      run.maxProgress = 0;
+      run.lastFix = { t: tCross, progress: 0 };
+      run.crossings = [];
+      run.sectorTimes = run.ends.map(() => null);
+      return 'lap';
+    }
   }
 
   run.maxProgress = effective;
   run.lastFix = { t: fix.t, progress };
   if (event === 'finish') run.state = 'finished';
   return event;
+}
+
+function isLoopWrap(run, progress) {
+  return run.closedLoop &&
+    run.maxProgress > run.total - LOOP_WRAP_RADIUS_M &&
+    progress < LOOP_WRAP_RADIUS_M;
 }
 
 // Linear interpolation of the timestamp at which `boundary` meters was passed,

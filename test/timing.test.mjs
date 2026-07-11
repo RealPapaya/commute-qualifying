@@ -15,6 +15,29 @@ function makeRoute(boundaries = [1000, 2000]) {
   return { points, cum, sectorBoundaries: boundaries };
 }
 
+const loopPoints = [
+  [25.0, 121.5],
+  [25.01, 121.5],
+  [25.01, 121.51],
+  [25.0, 121.5],
+];
+const loopCum = cumulativeDistances(loopPoints);
+const LOOP_TOTAL = loopCum.at(-1);
+
+function makeClosedLoopRoute() {
+  return {
+    points: loopPoints,
+    cum: loopCum,
+    sectorBoundaries: [LOOP_TOTAL / 2],
+    closedLoop: true,
+  };
+}
+
+function loopPosAt(dist) {
+  const [lat, lng] = pointAtDistance(loopPoints, loopCum, dist);
+  return { lat, lng };
+}
+
 // position at `dist` meters along the route, optionally offset east by `offM`
 function posAt(dist, offM = 0) {
   const [lat, lng] = pointAtDistance(points, cum, dist);
@@ -137,6 +160,29 @@ test('run does not start away from the start line', () => {
   assert.equal(feedFix(run, { ...posAt(800), t: 0 }), null);
   assert.equal(run.state, 'armed');
   assert.equal(feedFix(run, { ...posAt(10), t: 5000 }), 'start');
+});
+
+test('closed circuit saves a lap and keeps timing the next one', () => {
+  const run = createRun(makeClosedLoopRoute());
+  const boundary = LOOP_TOTAL / 2;
+
+  assert.equal(feedFix(run, { ...loopPosAt(0), t: 0 }), 'start');
+  assert.equal(feedFix(run, { ...loopPosAt(boundary + 10), t: 100000 }), 'sector');
+  assert.equal(feedFix(run, { ...loopPosAt(LOOP_TOTAL - 20), t: 180000 }), null);
+  assert.equal(feedFix(run, { ...loopPosAt(20), t: 200000 }), 'lap');
+  assert.equal(run.state, 'running');
+  assert.equal(run.completedLap.number, 1);
+  assert.ok(Math.abs(run.completedLap.totalTime - 190000) < 2);
+  assert.ok(run.completedLap.sectorTimes.every(t => t != null));
+  assert.deepEqual(run.sectorTimes, [null, null]);
+
+  assert.equal(feedFix(run, { ...loopPosAt(0), t: 200001 }), null);
+  assert.equal(feedFix(run, { ...loopPosAt(boundary + 10), t: 300001 }), 'sector');
+  assert.equal(feedFix(run, { ...loopPosAt(LOOP_TOTAL - 20), t: 380001 }), null);
+  assert.equal(feedFix(run, { ...loopPosAt(20), t: 400001 }), 'lap');
+  assert.equal(run.completedLap.number, 2);
+  assert.ok(Math.abs(run.completedLap.totalTime - 200001) < 2);
+  assert.equal(run.state, 'running');
 });
 
 // ---- best classification ----

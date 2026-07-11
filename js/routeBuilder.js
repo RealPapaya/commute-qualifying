@@ -99,6 +99,7 @@ export function openRoute(existing, { creationMode = 'plan' } = {}) {
     lights: [],
     sectorBoundaries: [],
     timingVersion: 1,
+    closedLoop: false,
   };
   if (recordingMode && !existing) route.snap = false;
   lastRecordingPoint = route.recorded ? route.points.at(-1) ?? null : null;
@@ -106,6 +107,7 @@ export function openRoute(existing, { creationMode = 'plan' } = {}) {
   resetPlaceInputs();
   const snapToggle = document.getElementById('snap-toggle');
   snapToggle.checked = route.snap !== false;
+  document.getElementById('closed-loop-toggle').checked = route.closedLoop === true;
   snapToggle.disabled = recordingMode;
   document.getElementById('gps-recording-panel').hidden = !recordingMode;
   document.getElementById('place-route-form').hidden = recordingMode;
@@ -565,6 +567,7 @@ function persist() {
     return;
   }
   route.name = document.getElementById('route-name').value.trim() || 'Unnamed route';
+  route.closedLoop = document.getElementById('closed-loop-toggle').checked;
   if (route.points.length < 2) {
     alert('Trace at least two points before saving.');
     return;

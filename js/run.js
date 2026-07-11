@@ -369,6 +369,7 @@ function simulate() {
   // Synthetic drive: ~13 m/s average, per-fix speed noise, small position
   // jitter, 1 Hz fixes, replayed at 10× real time.
   const total = route.cum.at(-1);
+  const continuous = route.closedLoop === true;
   let simDist = -10;               // start slightly before the line
   let t = 0;
   setSimClock(0);
@@ -377,10 +378,11 @@ function simulate() {
     simDist += speed;
     t += SIM_FIX_INTERVAL_MS * SIM_SPEEDUP;
     setSimClock(t);
-    const p = pointAtDistance(route.points, route.cum, Math.max(0, simDist));
+    const replayDistance = continuous ? (simDist % total + total) % total : Math.max(0, simDist);
+    const p = pointAtDistance(route.points, route.cum, replayDistance);
     const jitter = () => (Math.random() - 0.5) * 0.00008; // ~±5 m
     handleFix({ lat: p[0] + jitter(), lng: p[1] + jitter(), t });
-    if (simDist > total + 30 || run?.state === 'finished') {
+    if ((!continuous && simDist > total + 30) || run?.state === 'finished') {
       if (run && run.state !== 'finished') stopSession('Simulation ended.');
     }
   }, SIM_FIX_INTERVAL_MS);
@@ -473,34 +475,52 @@ function handleFix(fix) {
 
   if (ev === 'start') setStatus('LIVE — lap running.', 'live');
   if (ev === 'sector') { setStatus('LIVE — lap running.', 'live'); renderBoard(); }
+  if (ev === 'lap') finishLap();
   if (ev === 'finish') finishRun();
   if (ev === 'start') renderBoard();
 }
 
-function finishRun() {
-  const totalTime = run.crossings.at(-1) - run.startTime;
+function saveCompletedLap(lap) {
   const record = {
     id: newId(),
     routeId: route.id,
     timingVersion: route.timingVersion,
     date: new Date().toISOString(),
-    sectorTimes: [...run.sectorTimes],
-    totalTime,
+    sectorTimes: [...lap.sectorTimes],
+    totalTime: lap.totalTime,
     completed: true,
     simulated: simTimer != null,
   };
-  // classify BEFORE merging this run into bests
-  renderBoard();
   saveRun(record);
-  run.sectorTimes.forEach((t, i) => {
+  lap.sectorTimes.forEach((t, i) => {
     if (sessionBests[i] == null || t < sessionBests[i]) sessionBests[i] = t;
   });
   bests = allTimeBests(route.id, route.sectorBoundaries.length + 1, route.timingVersion);
-  setStatus(`FINISHED — ${fmtTime(totalTime)}${record.simulated ? ' (simulated)' : ''}`, 'live');
-  $('run-clock').textContent = fmtTime(totalTime);
+  onRunSaved?.(record);
+  return record;
+}
+
+function finishLap() {
+  const lap = run?.completedLap;
+  if (!lap) return;
+  const record = saveCompletedLap(lap);
+  setStatus(`LAP ${lap.number} FINISHED — ${fmtTime(lap.totalTime)}${record.simulated ? ' (simulated)' : ''}. Keep going for the next lap.`, 'live');
+  $('run-clock').textContent = fmtTime(0);
+  renderBoard();
+}
+
+function finishRun() {
+  const lap = {
+    sectorTimes: [...run.sectorTimes],
+    totalTime: run.crossings.at(-1) - run.startTime,
+  };
+  // classify BEFORE merging this run into bests
+  renderBoard();
+  const record = saveCompletedLap(lap);
+  setStatus(`FINISHED — ${fmtTime(lap.totalTime)}${record.simulated ? ' (simulated)' : ''}`, 'live');
+  $('run-clock').textContent = fmtTime(lap.totalTime);
   stopSession(null, /*keepBoard*/ true);
   showSummary(route, record, listRuns(route.id));
-  onRunSaved?.(record);
 }
 
 function stopSession(statusMsg, keepBoard = false) {
