@@ -126,6 +126,23 @@ try {
     .every(options => options.icon.html.startsWith('<svg')))) {
     throw new Error('start/end markers are not rendered as SVG');
   }
+  if (await page.evaluate(() => window.__markerOptions
+    .some(options => options?.icon?.className === 'light-icon'))) {
+    throw new Error('traffic lights appeared without using the manual light tool');
+  }
+  await page.click('[data-tool="light"]');
+  await page.evaluate(() =>
+    window._editorMap.fire('click', { latlng: { lat: 25.02, lng: 121.52 } }));
+  if (await page.evaluate(() => window.__markerOptions
+    .some(options => options?.icon?.className === 'light-icon'))) {
+    throw new Error('off-route traffic light was displayed');
+  }
+  await page.evaluate(() =>
+    window._editorMap.fire('click', { latlng: { lat: 25.003, lng: 121.5015 } }));
+  if (!await page.evaluate(() => window.__markerOptions
+    .some(options => options?.icon?.className === 'light-icon'))) {
+    throw new Error('on-route manual traffic light was not displayed');
+  }
   await page.waitForFunction(() =>
     !document.getElementById('route-stats').textContent.startsWith('0.00 km'));
   await page.click('#btn-save-route');
@@ -137,6 +154,11 @@ try {
     JSON.parse(localStorage.getItem('commute-qualifying-v1')).routes[0].waypoints);
   if (savedWaypoints.length !== 4) {
     throw new Error(`ordinary click added a waypoint or armed vias were lost: ${savedWaypoints.length}`);
+  }
+  const savedLights = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('commute-qualifying-v1')).routes[0].lights);
+  if (savedLights.length !== 1 || Math.abs(savedLights[0][0] - 25.003) > 1e-6) {
+    throw new Error(`manual traffic light was not snapped to the route: ${JSON.stringify(savedLights)}`);
   }
 
   await page.click('#route-list [data-run]');

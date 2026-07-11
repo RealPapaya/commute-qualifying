@@ -850,6 +850,22 @@ body {
   margin: 10px 0;
 }
 
+.place-role-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.place-role-btn {
+  min-height: 42px;
+  font-weight: 700;
+}
+
+.place-role-btn.complete {
+  border-color: var(--green);
+  color: var(--green);
+}
+
 .gps-recording-panel {
   display: grid;
   gap: 7px;
@@ -953,10 +969,21 @@ body {
   padding: 6px 8px;
 }
 
+.place-row-actions {
+  display: flex;
+  gap: 5px;
+}
+
 .place-route-actions {
   display: grid;
-  grid-template-columns: 1fr 1.4fr;
+  grid-template-columns: 1fr;
   margin: 0;
+}
+
+.place-map-pick.active {
+  border-color: var(--bar);
+  background: var(--bar);
+  color: #fff;
 }
 
 #place-route-status:not(:empty) {

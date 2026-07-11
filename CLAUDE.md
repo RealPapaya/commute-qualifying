@@ -50,8 +50,6 @@ be imported straight into `node --test` with no jsdom:
 - `js/timing.js` — the run state machine (`armed` → `running` → `finished`)
 - `js/trackDiagram.js` — `computeProjection`, `splitIntoSectors`, `detectCorners` are pure;
   `renderTrackDiagram` is not (tests stub `globalThis.document.createElementNS`)
-- `js/lightsImport.js` — `computeBBox`, `filterNearRoute`, `dedupeLights` are pure; the
-  Overpass fetch/debounce below them is not
 - `js/routeDrag.js` — `findInsertIndex` is pure
 - `js/summary.js` — `fmtClock`, `fmtLap`, `splitTitle`, `buildSummaryData` are pure
 
@@ -117,13 +115,11 @@ with different filter checkboxes.
 
 - **OSRM** (`router.project-osrm.org`) — road snapping. On failure the route falls back to
   straight lines between waypoints, with a `flashHelp` notice.
-- **Overpass** (`overpass-api.de`) — auto-imports `highway=traffic_signals` near the traced
-  route, debounced 1.8 s after geometry settles. Failures log and are otherwise silent.
 - **OSM tiles**, and **Google Street View** as a plain link-out from a light's popup (embedding
   needs a paid key).
 
-Both async importers use a monotonic sequence counter (`buildSeq` in `routeBuilder.js`, `seq` in
-`lightsImport.js`) to discard stale responses. Keep that pattern when adding another fetch.
+The OSRM importer uses a monotonic sequence counter (`buildSeq` in `routeBuilder.js`) to discard
+stale responses. Keep that pattern when adding another fetch.
 
 ### GPS session (`js/run.js`)
 

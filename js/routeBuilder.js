@@ -1,9 +1,8 @@
 // Route editor: trace waypoints, snap to roads via OSRM (fallback: straight
 // lines), mark traffic lights (with Street View link-out), edit sectors.
-import { cumulativeDistances } from './geo.js';
+import { cumulativeDistances, projectOnRoute } from './geo.js';
 import { initSectorTool, renderSectorHandles, defaultBoundaries } from './sectors.js';
 import { initRouteDrag } from './routeDrag.js';
-import { initLightsImport } from './lightsImport.js';
 import { renderTrackDiagram } from './trackDiagram.js';
 import { saveRoute, getRoute, newId } from './store.js';
 import { addBaseMap } from './baseMap.js';
@@ -22,9 +21,10 @@ let placeSuggestionId = 0;
 const selectedPlaces = new WeakMap();
 let recordingWatchId = null, recordingMarker = null;
 let recordingMode = false, lastRecordingPoint = null;
-let pendingViaPlacement = false, pendingViaInput = null;
+let pendingPlaceInput = null, pendingMapInput = null;
 
 const MIN_RECORDED_CHECKPOINT_M = 50;
+const MAX_LIGHT_ROUTE_DISTANCE_M = 30;
 
 const TOOL_HELP = {
   trace: 'Click once for the start and once for the finish. Use + 必經點 before adding each via point.',
@@ -58,11 +58,16 @@ export function initEditor(callbacks) {
   document.getElementById('btn-record-light').addEventListener('click', addRecordedLight);
   setupPlaceAutocomplete(document.getElementById('place-start'));
   setupPlaceAutocomplete(document.getElementById('place-end'));
+  document.querySelectorAll('[data-place-role]').forEach(button => {
+    button.addEventListener('click', () => beginPlaceSelection(button.dataset.placeRole));
+  });
+  document.querySelectorAll('[data-map-input]').forEach(button => {
+    button.addEventListener('click', () => beginMapPlacement(document.getElementById(button.dataset.mapInput)));
+  });
   document.getElementById('place-route-form').addEventListener('submit', event => {
     event.preventDefault();
     buildRouteFromPlaces();
   });
-  document.getElementById('btn-add-via').addEventListener('click', beginViaPlacement);
   document.getElementById('diagram-filter-sector-colors').addEventListener('change', refreshTrackDiagram);
   document.getElementById('diagram-filter-checkpoints').addEventListener('change', refreshTrackDiagram);
   document.getElementById('diagram-filter-lights').addEventListener('change', refreshTrackDiagram);
@@ -73,14 +78,6 @@ export function initEditor(callbacks) {
     getRoute: () => route,
     getPolyline: () => routeLine,
     rebuild: rebuildGeometry,
-    onAfterRebuild,
-  });
-  initLightsImport({
-    getRoute: () => route,
-    onImported: () => {
-      redrawLights();
-      refreshStats();
-    },
     onAfterRebuild,
   });
 }
@@ -94,8 +91,8 @@ export function onAfterRebuild(fn) {
 export function openRoute(existing, { creationMode = 'plan' } = {}) {
   stopGpsRecording({ quiet: true });
   placeSearchSeq += 1;
-  pendingViaPlacement = false;
-  pendingViaInput = null;
+  pendingPlaceInput = null;
+  pendingMapInput = null;
   recordingMode = creationMode === 'record' || existing?.recorded === true;
   route = existing ?? {
     id: newId(),
@@ -156,30 +153,52 @@ function addViaInput(value = '') {
   inputWrap.className = 'place-input-wrap';
   inputWrap.append(input);
   setupPlaceAutocomplete(input, inputWrap);
+  const mapPick = document.createElement('button');
+  mapPick.type = 'button';
+  mapPick.className = 'btn place-map-pick';
+  mapPick.textContent = '點地圖';
+  mapPick.addEventListener('click', () => beginMapPlacement(input));
   const remove = document.createElement('button');
   remove.type = 'button';
   remove.className = 'btn place-remove';
   remove.textContent = '移除';
   remove.addEventListener('click', () => {
-    if (pendingViaInput === input) {
-      pendingViaInput = null;
-      pendingViaPlacement = false;
+    if (pendingPlaceInput === input) {
+      pendingPlaceInput = null;
+      pendingMapInput = null;
     }
     row.remove();
-    redrawPlacePins();
+    if (!rebuildRouteFromSelectedPlaces()) redrawPlacePins();
+    updatePlaceControls();
   });
 
-  row.append(label, inputWrap, remove);
+  const actions = document.createElement('div');
+  actions.className = 'place-row-actions';
+  actions.append(mapPick, remove);
+  row.append(label, inputWrap, actions);
   document.getElementById('place-via-list').append(row);
   input.focus();
   return input;
 }
 
-function beginViaPlacement() {
-  pendingViaInput = addViaInput();
-  pendingViaPlacement = true;
+function beginPlaceSelection(role) {
+  const input = role === 'via'
+    ? addViaInput()
+    : document.getElementById(`place-${role}`);
+  input.closest('.place-input-row').hidden = false;
+  pendingPlaceInput = input;
+  pendingMapInput = null;
+  input.focus();
+  updatePlaceControls();
+  setPlaceStatus(`請輸入${role === 'start' ? '起點' : role === 'end' ? '終點' : '必經點'}，或選擇「點地圖」。`);
+}
+
+function beginMapPlacement(input) {
+  pendingPlaceInput = input;
+  pendingMapInput = input;
   setTool('trace');
-  flashHelp('Click the map once to place the new 必經點.');
+  updatePlaceControls();
+  flashHelp('請在地圖上點一下以完成這個路徑點。');
 }
 
 function resetPlaceInputs() {
@@ -190,9 +209,29 @@ function resetPlaceInputs() {
   end.value = '';
   selectedPlaces.delete(start);
   selectedPlaces.delete(end);
+  start.closest('.place-input-row').hidden = true;
+  end.closest('.place-input-row').hidden = true;
   document.getElementById('place-via-list').replaceChildren();
+  pendingPlaceInput = null;
+  pendingMapInput = null;
   setPlaceStatus('');
   document.getElementById('btn-build-place-route').disabled = false;
+  updatePlaceControls();
+}
+
+function updatePlaceControls() {
+  const waiting = pendingPlaceInput && !selectedPlaces.has(pendingPlaceInput);
+  document.querySelectorAll('[data-place-role]').forEach(button => {
+    button.disabled = Boolean(waiting);
+  });
+  document.getElementById('btn-place-start').classList.toggle(
+    'complete', selectedPlaces.has(document.getElementById('place-start')));
+  document.getElementById('btn-place-end').classList.toggle(
+    'complete', selectedPlaces.has(document.getElementById('place-end')));
+  document.querySelectorAll('.place-map-pick').forEach(button => {
+    const rowInput = button.closest('.place-input-row')?.querySelector('.place-input');
+    button.classList.toggle('active', rowInput === pendingMapInput);
+  });
 }
 
 function setPlaceStatus(message) {
@@ -296,8 +335,11 @@ function setupPlaceAutocomplete(input, inputWrap = input.parentElement) {
       option.addEventListener('click', () => {
         input.value = placeLabel(place);
         selectedPlaces.set(input, place);
+        pendingPlaceInput = null;
+        pendingMapInput = null;
         hide();
         applySelectedPlace(input, place);
+        updatePlaceControls();
       });
       item.append(option);
       return item;
@@ -308,7 +350,10 @@ function setupPlaceAutocomplete(input, inputWrap = input.parentElement) {
 
   input.addEventListener('input', () => {
     selectedPlaces.delete(input);
+    pendingPlaceInput = input;
+    pendingMapInput = null;
     redrawPlacePins();
+    updatePlaceControls();
     clearTimeout(timer);
     hide();
     const query = input.value.trim();
@@ -332,33 +377,30 @@ function setupPlaceAutocomplete(input, inputWrap = input.parentElement) {
 }
 
 function applySelectedPlace(input, place) {
-  const startInput = document.getElementById('place-start');
-  const endInput = document.getElementById('place-end');
-  if (input === startInput) {
-    if (route.waypoints.length) route.waypoints[0] = place.point;
-    else route.waypoints.push(place.point);
-    const selectedEnd = selectedPlaces.get(endInput);
-    if (route.waypoints.length === 1 && selectedEnd) route.waypoints.push(selectedEnd.point);
-  } else if (input === endInput) {
-    if (route.waypoints.length > 1) route.waypoints[route.waypoints.length - 1] = place.point;
-    else if (route.waypoints.length === 1) route.waypoints.push(place.point);
-    else {
-      redrawPlacePins(place);
-      return;
-    }
-  } else {
-    pendingViaPlacement = false;
-    pendingViaInput = null;
+  if (!rebuildRouteFromSelectedPlaces()) {
     redrawPlacePins(place);
     return;
   }
-  route.recorded = false;
-  clearPlacePins();
-  redrawPlacePins();
-  rebuildGeometry();
   const zoom = Math.max(map.getZoom?.() ?? 0, 15);
   if (map.flyTo) map.flyTo(place.point, zoom, { duration: 0.35 });
   else map.setView(place.point, zoom);
+}
+
+function rebuildRouteFromSelectedPlaces() {
+  const start = selectedPlaces.get(document.getElementById('place-start'));
+  const end = selectedPlaces.get(document.getElementById('place-end'));
+  if (!start || !end) {
+    return false;
+  }
+  route.waypoints = [
+    start.point,
+    ...viaInputs().map(via => selectedPlaces.get(via)?.point).filter(Boolean),
+    end.point,
+  ];
+  route.recorded = false;
+  clearPlacePins();
+  rebuildGeometry();
+  return true;
 }
 
 async function buildRouteFromPlaces() {
@@ -394,14 +436,15 @@ async function buildRouteFromPlaces() {
     if (seq !== placeSearchSeq) return;
 
     route.waypoints = resolved.map(place => place.point);
-    pendingViaPlacement = false;
-    pendingViaInput = null;
+    pendingPlaceInput = null;
+    pendingMapInput = null;
     clearPlacePins();
     await rebuildGeometry();
     if (route.points.length > 1) {
       map.fitBounds(L.latLngBounds(route.points), { padding: [30, 30] });
     }
     setPlaceStatus(`路線已建立：${resolved.map(placeLabel).join(' → ')}`);
+    updatePlaceControls();
   } catch (error) {
     if (seq === placeSearchSeq) {
       setPlaceStatus(`找不到地點，請嘗試更完整的地址或改用地圖點選。${error.message}`);
@@ -543,21 +586,33 @@ function onMapClick(e) {
   if (recordingWatchId !== null) return;
   const p = [e.latlng.lat, e.latlng.lng];
   if (activeTool === 'trace') {
+    if (pendingMapInput) {
+      const input = pendingMapInput;
+      const place = { point: p, name: '地圖選點', detail: '' };
+      input.value = place.name;
+      selectedPlaces.set(input, place);
+      pendingPlaceInput = null;
+      pendingMapInput = null;
+      applySelectedPlace(input, place);
+      updatePlaceControls();
+      setPlaceStatus('地圖位置已選定，可以加入下一個點。');
+      return;
+    }
     route.recorded = false;
     if (route.waypoints.length < 2) {
       route.waypoints.push(p);
-    } else if (pendingViaPlacement) {
-      route.waypoints.splice(route.waypoints.length - 1, 0, p);
-      pendingViaPlacement = false;
-      pendingViaInput?.closest('.place-input-row')?.remove();
-      pendingViaInput = null;
     } else {
-      flashHelp('Press + 必經點 before adding another route point.');
+      flashHelp('請先按「必經點」，再選擇「點地圖」。');
       return;
     }
     rebuildGeometry();
   } else if (activeTool === 'light') {
-    route.lights.push(p);
+    const projection = projectLightOnRoute(p);
+    if (!projection) {
+      flashHelp('Traffic lights must be placed on the route.');
+      return;
+    }
+    route.lights.push(projection.point);
     redrawLights();
     refreshStats();
   }
@@ -572,8 +627,8 @@ function undoWaypoint() {
 function clearTrace() {
   if (!confirm('Clear the whole trace (waypoints, lights, sectors)?')) return;
   route.recorded = false;
-  pendingViaPlacement = false;
-  pendingViaInput = null;
+  pendingPlaceInput = null;
+  pendingMapInput = null;
   route.waypoints = [];
   route.lights = [];
   route.sectorBoundaries = [];
@@ -702,24 +757,41 @@ function redrawWaypoints() {
 
 function redrawLights() {
   lightMarkers.forEach(m => m.remove());
-  lightMarkers = route.lights.map((p, i) => {
-    const m = L.marker(p, {
+  lightMarkers = visibleLights().map(({ point, index }) => {
+    const m = L.marker(point, {
       icon: L.divIcon({ className: 'light-icon', html: '🚦', iconSize: [20, 20] }),
     }).addTo(map);
     m.bindPopup(
-      `<a href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${p[0]},${p[1]}"` +
+      `<a href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${point[0]},${point[1]}"` +
       ` target="_blank" rel="noopener">Open Street View</a><br>` +
-      `<a href="#" data-del-light="${i}">Remove light</a>`);
+      `<a href="#" data-del-light="${index}">Remove light</a>`);
     m.on('popupopen', ev => {
       ev.popup.getElement().querySelector('[data-del-light]')
         ?.addEventListener('click', e => {
           e.preventDefault();
-          route.lights.splice(i, 1);
+          route.lights.splice(index, 1);
           redrawLights();
         });
     });
     return m;
   });
+}
+
+function projectLightOnRoute(point) {
+  const cum = getCum();
+  if (!cum) return null;
+  const projection = projectOnRoute(point, route.points, cum);
+  return projection && projection.offRoute <= MAX_LIGHT_ROUTE_DISTANCE_M ? projection : null;
+}
+
+function visibleLights() {
+  return route.lights.map((point, index) => ({
+    index,
+    projection: projectLightOnRoute(point),
+  })).filter(light => light.projection).map(light => ({
+    index: light.index,
+    point: light.projection.point,
+  }));
 }
 
 function refreshSectorSummary() {
@@ -740,7 +812,7 @@ function refreshStats() {
   const cum = getCum();
   const total = cum ? (cum.at(-1) / 1000).toFixed(2) : '0.00';
   document.getElementById('route-stats').textContent =
-    `${total} km · ${route.lights.length} 🚦 · ${route.sectorBoundaries.length + 1} sectors`;
+    `${total} km · ${visibleLights().length} 🚦 · ${route.sectorBoundaries.length + 1} sectors`;
   document.getElementById('btn-track-diagram').disabled = route.points.length <= 1;
   document.getElementById('btn-clear-lights').disabled = route.lights.length === 0;
   updateClosedLoopControl();
@@ -799,6 +871,7 @@ function persist() {
     return;
   }
   route.name = document.getElementById('route-name').value.trim() || 'Unnamed route';
+  route.lights = visibleLights().map(light => light.point);
   route.closedLoop = hasMatchingEndpoints() &&
     document.getElementById('closed-loop-toggle').checked;
   if (route.points.length < 2) {

@@ -80,20 +80,10 @@ await page.waitForSelector('.wp-marker', { state: 'visible' });
 console.log('editor restored after track diagram back, wp-markers:',
   await page.locator('.wp-marker').count());
 
-// ---- 1a. Feature C: traffic lights should appear automatically after
-// tracing (live Overpass query, no manual light-tool clicks). Best-effort
-// only — real OSM signal coverage near this route and Overpass's own
-// availability aren't guaranteed, so this logs rather than failing the run;
-// a genuine regression (e.g. a thrown error in lightsImport.js) is still
-// caught by the pageerror listener below.
-const autoLights = await page.waitForFunction(() =>
-  document.querySelectorAll('.light-icon').length > 0, null, { timeout: 20000 })
-  .then(() => true)
-  .catch(() => false);
-console.log('auto-imported lights appeared:', autoLights,
-  autoLights ? `(${await page.locator('.light-icon').count()})` :
-    '(best-effort: depends on live Overpass + OSM signal coverage near the route)');
-if (autoLights) await shot('1a-lights-auto-imported');
+// Traffic lights are manual-only; tracing a route must not create any.
+if (await page.locator('.light-icon').count()) {
+  throw new Error('traffic lights were imported automatically');
+}
 
 // ---- 1b. Feature A: drag the middle of the route path itself (not a
 // waypoint marker) — should splice in a new via waypoint and reroute ----
@@ -139,8 +129,11 @@ await shot('2-waypoint-dragged');
 
 // ---- 3. traffic lights near two intersections along the route ----
 await page.click('[data-tool="light"]');
-await clickMap([25.012, 121.4487]);
-await clickMap([25.0405, 121.4383]);
+await clickMap([25.5, 121.9]); // off-route: rejected
+await clickMap(WP1); // on-route: accepted and snapped to the route
+if (await page.locator('.light-icon').count() !== 1) {
+  throw new Error('manual traffic-light route filtering failed');
+}
 await shot('3-traffic-lights');
 
 // ---- 4. sectors: 3 -> 4, then drag a boundary handle along the route ----

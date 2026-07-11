@@ -2,11 +2,12 @@
 
 ## Frame
 
-Goal: let a driver build a route from a start, end, and zero or more ordered via-place text inputs, while retaining map-click tracing.
+Goal: let a driver add start, end, and ordered via points from three role buttons, choosing either place search or a map click for each point.
 
 In scope:
 - Address/place search to latitude/longitude.
 - Ordered start, via, and end fields in the route editor.
+- Lock new-point buttons until the currently opened point has been selected.
 - Rebuild the existing OSRM route from the resolved coordinates.
 
 Out of scope:
@@ -26,18 +27,19 @@ Contract: `searchPlace(query)` resolves to `{ point: [latitude, longitude], name
 
 | File | Change |
 | --- | --- |
-| `index.html` | Add start, via, end inputs and route-build controls. |
-| `css/style.css` | Style the compact place-input group. |
+| `index.html` | Add the three point-role buttons and per-point search/map controls. |
+| `css/style.css` | Style the compact role buttons and point-input group. |
 | `js/geocode.js` | New narrow Nominatim search module. |
 | `js/routeBuilder.js` | Wire controls to ordered geocoding and existing rebuild. |
 | `test/geocode.test.mjs` | Unit-test the response contract. |
 | `test/address-route.mjs` | Browser smoke test for the visible controls and route rebuild. |
+| `test/address-suggestions.mjs` | Keep autocomplete coverage aligned with the role-button flow. |
 
 ## Steps
 
-1. Add the input controls and matching compact styling. Verify: controls fit in the editor panel at desktop and phone widths.
+1. Add the role buttons, input controls, and matching compact styling. Verify: all three roles are visible and controls fit in the editor panel at desktop and phone widths.
 2. Add the narrow geocoding module and unit tests. Verify: `npm test` passes.
-3. Resolve inputs sequentially, replace waypoints only after all succeed, then call the existing geometry rebuild. Verify: browser smoke test sees three markers and an OSRM/straight-line route.
+3. Lock role buttons while a point is pending; unlock after an autocomplete or map selection, then rebuild from completed points. Verify: browser smoke test checks locked/unlocked states and sees three ordered markers.
 
 ## Risks
 

@@ -104,17 +104,23 @@
         <p id="gps-recording-status" class="hint" role="status" aria-live="polite" data-i18n="readyRecord">Ready to record.</p>
       </section>
       <form id="place-route-form" class="place-route-form">
-        <div class="place-input-row">
+        <div class="place-role-actions" aria-label="新增路徑點">
+          <button id="btn-place-start" type="button" class="btn place-role-btn" data-place-role="start">起點</button>
+          <button id="btn-place-end" type="button" class="btn place-role-btn" data-place-role="end">終點</button>
+          <button id="btn-add-via" type="button" class="btn place-role-btn" data-place-role="via">必經點</button>
+        </div>
+        <div class="place-input-row" data-place-row="start" hidden>
           <label for="place-start" data-i18n="start">起點</label>
           <input id="place-start" class="place-input" type="search" placeholder="輸入路名、地址或地標" autocomplete="street-address" data-i18n-placeholder="placePlaceholder">
+          <button type="button" class="btn place-map-pick" data-map-input="place-start">點地圖</button>
         </div>
         <div id="place-via-list" class="place-via-list"></div>
-        <div class="place-input-row">
+        <div class="place-input-row" data-place-row="end" hidden>
           <label for="place-end" data-i18n="end">終點</label>
           <input id="place-end" class="place-input" type="search" placeholder="輸入路名、地址或地標" autocomplete="street-address" data-i18n-placeholder="placePlaceholder">
+          <button type="button" class="btn place-map-pick" data-map-input="place-end">點地圖</button>
         </div>
         <div class="toolbar place-route-actions">
-          <button id="btn-add-via" type="button" class="btn" data-i18n="addVia">+ 必經點</button>
           <button id="btn-build-place-route" class="btn primary" data-i18n="buildRoute">依地點規劃路線</button>
         </div>
         <p id="place-route-status" class="hint" role="status" aria-live="polite"></p>
