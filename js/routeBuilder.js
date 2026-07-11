@@ -13,7 +13,7 @@ import { acceptedRecordingPoint } from './gpsRouteRecorder.js';
 const OSRM = 'https://router.project-osrm.org/route/v1/driving/';
 
 let map, route, activeTool = 'trace';
-let routeLine, routeLineCasing, wpMarkers = [], lightMarkers = [];
+let routeLine, routeLineCasing, wpMarkers = [], lightMarkers = [], placeMarkers = [];
 let onSaved = null;
 let buildSeq = 0; // stale-response guard for async OSRM rebuilds
 let afterRebuildHandlers = []; // hooks run once the polyline/markers are freshly redrawn
@@ -157,7 +157,10 @@ function addViaInput(value = '') {
   remove.type = 'button';
   remove.className = 'btn place-remove';
   remove.textContent = '移除';
-  remove.addEventListener('click', () => row.remove());
+  remove.addEventListener('click', () => {
+    row.remove();
+    redrawPlacePins();
+  });
 
   row.append(label, inputWrap, remove);
   document.getElementById('place-via-list').append(row);
@@ -165,6 +168,7 @@ function addViaInput(value = '') {
 }
 
 function resetPlaceInputs() {
+  clearPlacePins();
   const start = document.getElementById('place-start');
   const end = document.getElementById('place-end');
   start.value = '';
@@ -178,6 +182,43 @@ function resetPlaceInputs() {
 
 function setPlaceStatus(message) {
   document.getElementById('place-route-status').textContent = message;
+}
+
+function selectedPlaceInputs() {
+  return [
+    { input: document.getElementById('place-start'), label: '起點' },
+    ...viaInputs().map((input, index) => ({ input, label: `必經點 ${index + 1}` })),
+    { input: document.getElementById('place-end'), label: '終點' },
+  ];
+}
+
+function placeLabel(place) {
+  return place.detail ? `${place.name} · ${place.detail}` : place.name;
+}
+
+function clearPlacePins() {
+  placeMarkers.forEach(marker => marker.remove());
+  placeMarkers = [];
+}
+
+function redrawPlacePins(focusPlace = null) {
+  clearPlacePins();
+  selectedPlaceInputs().forEach(({ input, label }) => {
+    const place = selectedPlaces.get(input);
+    if (!place) return;
+    const marker = L.marker(place.point, {
+      title: `${label}: ${placeLabel(place)}`,
+      alt: `${label}: ${placeLabel(place)}`,
+      riseOnHover: true,
+      zIndexOffset: 1000,
+    }).addTo(map);
+    marker.bindTooltip?.(label, { direction: 'top', offset: [0, -32] });
+    placeMarkers.push(marker);
+  });
+  if (!focusPlace) return;
+  const zoom = Math.max(map.getZoom?.() ?? 0, 15);
+  if (map.flyTo) map.flyTo(focusPlace.point, zoom, { duration: 0.35 });
+  else map.setView(focusPlace.point, zoom);
 }
 
 function setupPlaceAutocomplete(input, inputWrap = input.parentElement) {
@@ -214,11 +255,12 @@ function setupPlaceAutocomplete(input, inputWrap = input.parentElement) {
       option.type = 'button';
       option.className = 'place-suggestion';
       option.setAttribute('role', 'option');
-      option.textContent = place.name;
+      option.textContent = placeLabel(place);
       option.addEventListener('click', () => {
-        input.value = place.name;
+        input.value = placeLabel(place);
         selectedPlaces.set(input, place);
         hide();
+        redrawPlacePins(place);
       });
       item.append(option);
       return item;
@@ -277,16 +319,19 @@ async function buildRouteFromPlaces() {
     for (const [index, place] of places.entries()) {
       if (index && !place.selected) await new Promise(resolve => setTimeout(resolve, 1100));
       setPlaceStatus(`正在尋找${place.label}（${index + 1}/${places.length}）…`);
-      resolved.push(place.selected ?? await searchPlace(place.query));
+      const resolvedPlace = place.selected ?? await searchPlace(place.query);
+      selectedPlaces.set(place.input, resolvedPlace);
+      resolved.push(resolvedPlace);
     }
     if (seq !== placeSearchSeq) return;
 
     route.waypoints = resolved.map(place => place.point);
+    redrawPlacePins();
     await rebuildGeometry();
     if (route.points.length > 1) {
       map.fitBounds(L.latLngBounds(route.points), { padding: [30, 30] });
     }
-    setPlaceStatus(`路線已建立：${resolved.map(place => place.name).join(' → ')}`);
+    setPlaceStatus(`路線已建立：${resolved.map(placeLabel).join(' → ')}`);
   } catch (error) {
     if (seq === placeSearchSeq) {
       setPlaceStatus(`找不到地點，請嘗試更完整的地址或改用地圖點選。${error.message}`);

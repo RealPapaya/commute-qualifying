@@ -2,26 +2,69 @@
 // directly, so callers keep requests sequential and show their own progress.
 const NOMINATIM = 'https://nominatim.openstreetmap.org/search';
 
-export function parsePlace(results) {
-  const result = results?.find(item =>
-    Number.isFinite(Number(item.lat)) && Number.isFinite(Number(item.lon)));
-  if (!result) throw new Error('沒有符合的搜尋結果。');
-
-  const point = [Number(result.lat), Number(result.lon)];
-  if (point[0] < -90 || point[0] > 90 || point[1] < -180 || point[1] > 180) {
-    throw new Error('搜尋結果的座標無效。');
+function placeFromResult(result) {
+  if (result?.lat === '' || result?.lat == null || result?.lon === '' || result?.lon == null) {
+    return null;
   }
-  return { point, name: result.display_name || '已選取地點' };
+  const point = [Number(result.lat), Number(result.lon)];
+  if (!Number.isFinite(point[0]) || !Number.isFinite(point[1]) ||
+    point[0] < -90 || point[0] > 90 || point[1] < -180 || point[1] > 180) {
+    return null;
+  }
+  const displayName = result.display_name?.trim() || '';
+  const displayParts = displayName.split(',').map(part => part.trim()).filter(Boolean);
+  const name = result.name?.trim() || result.namedetails?.name?.trim() ||
+    displayParts[0] || '已選取地點';
+  const detail = normalizeSearchText(name) === normalizeSearchText(displayParts[0])
+    ? displayParts.slice(1).join(', ')
+    : displayName;
+  return { point, name, ...(detail && { detail }) };
 }
 
-export function parsePlaces(results) {
-  return (results ?? []).flatMap(result => {
-    const point = [Number(result.lat), Number(result.lon)];
-    if (!Number.isFinite(point[0]) || !Number.isFinite(point[1]) ||
-      point[0] < -90 || point[0] > 90 || point[1] < -180 || point[1] > 180) {
-      return [];
-    }
-    return [{ point, name: result.display_name || '搜尋結果' }];
+function normalizeSearchText(value) {
+  return String(value ?? '').toLocaleLowerCase().replace(/[\s,，、.-]/g, '');
+}
+
+function matchRank(result, query) {
+  const term = normalizeSearchText(query);
+  if (!term) return 0;
+  const name = normalizeSearchText(result.name || result.namedetails?.name ||
+    result.display_name?.split(',')[0]);
+  const displayName = normalizeSearchText(result.display_name);
+  if (name === term) return 3;
+  if (name.startsWith(term)) return 2;
+  return name.includes(term) || displayName.includes(term) ? 1 : 0;
+}
+
+export function parsePlace(results) {
+  const place = (results ?? []).map(placeFromResult).find(Boolean);
+  if (!place) throw new Error('沒有符合的搜尋結果。');
+  return place;
+}
+
+export function parsePlaces(results, query = '') {
+  const seen = new Set();
+  return (results ?? []).flatMap((result, index) => {
+    const place = placeFromResult(result);
+    if (!place) return [];
+    const key = place.point.map(value => value.toFixed(5)).join(',');
+    if (seen.has(key)) return [];
+    seen.add(key);
+    return [{ place, index, rank: matchRank(result, query), importance: Number(result.importance) || 0 }];
+  }).sort((a, b) =>
+    b.rank - a.rank || b.importance - a.importance || a.index - b.index,
+  ).map(result => result.place);
+}
+
+function searchParams(term, limit) {
+  return new URLSearchParams({
+    format: 'jsonv2',
+    limit: String(limit),
+    'accept-language': 'zh-TW',
+    addressdetails: '1',
+    namedetails: '1',
+    countrycodes: 'tw',
+    q: term,
   });
 }
 
@@ -29,13 +72,7 @@ export async function searchPlace(query, fetcher = fetch) {
   const term = query.trim();
   if (!term) throw new Error('請輸入地點。');
 
-  const params = new URLSearchParams({
-    format: 'jsonv2',
-    limit: '1',
-    'accept-language': 'zh-TW',
-    q: term,
-  });
-  const response = await fetcher(`${NOMINATIM}?${params}`, {
+  const response = await fetcher(`${NOMINATIM}?${searchParams(term, 1)}`, {
     signal: AbortSignal.timeout(10000),
   });
   if (!response.ok) throw new Error('地點搜尋服務暫時無法使用。');
@@ -44,17 +81,11 @@ export async function searchPlace(query, fetcher = fetch) {
 
 export async function searchPlaces(query, fetcher = fetch) {
   const term = query.trim();
-  if (!term) throw new Error('請輸入地點名稱');
+  if (!term) throw new Error('請輸入地點。');
 
-  const params = new URLSearchParams({
-    format: 'jsonv2',
-    limit: '5',
-    'accept-language': 'zh-TW',
-    q: term,
-  });
-  const response = await fetcher(`${NOMINATIM}?${params}`, {
+  const response = await fetcher(`${NOMINATIM}?${searchParams(term, 5)}`, {
     signal: AbortSignal.timeout(10000),
   });
-  if (!response.ok) throw new Error('地點搜尋暫時無法使用');
-  return parsePlaces(await response.json());
+  if (!response.ok) throw new Error('地點搜尋服務暫時無法使用。');
+  return parsePlaces(await response.json(), term);
 }
