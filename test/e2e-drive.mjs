@@ -46,15 +46,18 @@ async function clickMap(latlng) {
 }
 const stats = () => page.locator('#route-stats').textContent();
 
-// trace waypoints; markers are redrawn only after the OSRM re-snap resolves,
-// so waiting for the marker count covers the async rebuild too
-const wps = [START, WP1, WP2, END];
-for (let i = 0; i < wps.length; i++) {
-  await clickMap(wps[i]);
+// Place the two endpoints, then explicitly arm each red via point.
+await clickMap(START);
+await page.waitForSelector('.route-start-marker');
+await clickMap(END);
+await page.waitForSelector('.route-end-marker');
+for (let i = 0; i < [WP1, WP2].length; i++) {
+  await page.click('#btn-add-via');
+  await clickMap([WP1, WP2][i]);
   await page.waitForFunction(n =>
     document.querySelectorAll('.wp-marker').length === n, i + 1,
     { timeout: 20000 });
-  console.log(`wp${i + 1}:`, await stats());
+  console.log(`via${i + 1}:`, await stats());
 }
 console.log('traced:', await stats());
 await shot('1-route-traced');

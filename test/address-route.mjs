@@ -24,13 +24,18 @@ await page.goto('http://localhost:8080/');
 await page.evaluate(() => localStorage.clear());
 await page.reload();
 await page.click('#btn-new-route');
+await page.waitForSelector('#new-route-options:not([hidden])');
 await page.click('[data-new-route-mode="plan"]');
+await page.waitForFunction(() => document.getElementById('view-editor').classList.contains('active'));
 await page.fill('#place-start', '起點');
 await page.click('#btn-add-via');
 await page.fill('#place-via-list .place-input', '必經點');
 await page.fill('#place-end', '終點');
 await page.click('#btn-build-place-route');
-await page.waitForFunction(() => document.querySelectorAll('.wp-marker').length === 3,
+await page.waitForFunction(() =>
+  document.querySelectorAll('.route-start-marker').length === 1 &&
+  document.querySelectorAll('.route-end-marker').length === 1 &&
+  document.querySelectorAll('.wp-marker').length === 1,
   null, { timeout: 20000 });
 
 const status = await page.locator('#place-route-status').textContent();

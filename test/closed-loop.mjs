@@ -7,6 +7,8 @@ const errors = [];
 page.on('pageerror', error => errors.push(String(error)));
 
 await page.addInitScript(() => {
+  const markerOptions = [];
+  const markerStates = [];
   const makeLayer = () => {
     const layer = {
       addTo: () => layer,
@@ -47,7 +49,16 @@ await page.addInitScript(() => {
       }),
     }),
     polyline: makeLayer,
-    marker: makeLayer,
+    marker: (point, options) => {
+      markerOptions.push(options);
+      const layer = makeLayer();
+      const handlers = {};
+      let current = point;
+      layer.on = (event, handler) => { handlers[event] = handler; return layer; };
+      layer.getLatLng = () => ({ lat: current[0], lng: current[1] });
+      markerStates.push({ options, handlers, setPoint: point => { current = point; } });
+      return layer;
+    },
     circleMarker: makeLayer,
     layerGroup: makeLayer,
     divIcon: options => options,
@@ -57,6 +68,12 @@ await page.addInitScript(() => {
     configurable: true,
     value: { getCurrentPosition: () => {} },
   });
+  window.__markerOptions = markerOptions;
+  window.__dragLatestMarker = (title, point) => {
+    const state = markerStates.findLast(marker => marker.options?.title === title);
+    state.setPoint(point);
+    state.handlers.dragend();
+  };
 });
 
 try {
@@ -76,17 +93,39 @@ try {
       throw new Error(`editor did not open: ${JSON.stringify(state)}; pageerrors: ${errors.join('\n')}`);
     });
   await page.locator('#snap-toggle').locator('..').click();
+  if (!await page.locator('#closed-loop-toggle').isDisabled()) {
+    throw new Error('closed-loop toggle should be disabled before endpoints match');
+  }
+  await page.evaluate(() => {
+    window._editorMap.fire('click', { latlng: { lat: 25.0, lng: 121.5 } });
+    window._editorMap.fire('click', { latlng: { lat: 25.003, lng: 121.503 } });
+    window._editorMap.fire('click', { latlng: { lat: 25.004, lng: 121.504 } });
+  });
+  if (!await page.locator('#closed-loop-toggle').isDisabled()) {
+    throw new Error('closed-loop toggle enabled while endpoints differ');
+  }
+  await page.evaluate(() => window.__dragLatestMarker('終點', [25.0, 121.5]));
+  if (await page.locator('#closed-loop-toggle').isDisabled()) {
+    throw new Error('dragging the finish onto the start did not enable closed-loop');
+  }
+  for (const [lat, lng] of [[25.003, 121.5], [25.003, 121.503]]) {
+    await page.click('#btn-add-via');
+    await page.evaluate(([lat, lng]) =>
+      window._editorMap.fire('click', { latlng: { lat, lng } }), [lat, lng]);
+  }
   await page.locator('#closed-loop-toggle').locator('..').click();
-  await page.evaluate(points => {
-    for (const [lat, lng] of points) {
-      window._editorMap.fire('click', { latlng: { lat, lng } });
-    }
-  }, [
-    [25.0, 121.5],
-    [25.003, 121.5],
-    [25.003, 121.503],
-    [25.0, 121.5],
-  ]);
+  const markerClasses = await page.evaluate(() => window.__markerOptions
+    .map(options => options?.icon?.className).filter(Boolean));
+  if (markerClasses.filter(name => name.includes('route-start-marker')).length < 1 ||
+      markerClasses.filter(name => name.includes('route-end-marker')).length < 1 ||
+      markerClasses.filter(name => name === 'wp-marker').length < 2) {
+    throw new Error(`manual route marker roles missing: ${markerClasses.join(', ')}`);
+  }
+  if (!await page.evaluate(() => window.__markerOptions
+    .filter(options => options?.icon?.className?.includes('route-endpoint-marker'))
+    .every(options => options.icon.html.startsWith('<svg')))) {
+    throw new Error('start/end markers are not rendered as SVG');
+  }
   await page.waitForFunction(() =>
     !document.getElementById('route-stats').textContent.startsWith('0.00 km'));
   await page.click('#btn-save-route');
@@ -94,6 +133,11 @@ try {
     const saved = JSON.parse(localStorage.getItem('commute-qualifying-v1'));
     return saved?.routes?.[0]?.closedLoop === true;
   });
+  const savedWaypoints = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('commute-qualifying-v1')).routes[0].waypoints);
+  if (savedWaypoints.length !== 4) {
+    throw new Error(`ordinary click added a waypoint or armed vias were lost: ${savedWaypoints.length}`);
+  }
 
   await page.click('#route-list [data-run]');
   await page.click('#btn-simulate');

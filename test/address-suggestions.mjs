@@ -16,6 +16,7 @@ const errors = [];
 page.on('pageerror', error => errors.push(String(error)));
 await page.addInitScript(() => {
   const markerOptions = [];
+  const markerStates = [];
   const layer = () => ({
     addTo() { return this; },
     remove() {},
@@ -43,14 +44,20 @@ await page.addInitScript(() => {
     polyline: layer,
     marker(_, options) {
       markerOptions.push(options);
-      return layer();
+      const state = { options, active: false };
+      markerStates.push(state);
+      const marker = layer();
+      marker.addTo = () => { state.active = true; return marker; };
+      marker.remove = () => { state.active = false; };
+      return marker;
     },
     circleMarker: layer,
     layerGroup: layer,
-    divIcon() { return {}; },
+    divIcon(options) { return options; },
     latLngBounds(points) { return points; },
   };
   window.__markerOptions = markerOptions;
+  window.__markerStates = markerStates;
 });
 await page.route('https://unpkg.com/**', route => route.fulfill({ body: '' }));
 await page.route('https://nominatim.openstreetmap.org/search**', async route => {
@@ -87,19 +94,32 @@ if (await page.locator('#place-start').inputValue() !==
   'Taipei Main Station · Zhongzheng District, Taipei') {
   throw new Error('selecting a start suggestion did not fill the input');
 }
-await page.waitForFunction(() => window.__markerOptions.some(options =>
-  options.title?.includes('Taipei Main Station')));
+await page.waitForFunction(() => window.__markerStates.some(state => state.active &&
+  state.options?.icon?.className?.includes('route-start-marker') &&
+  state.options.icon.html.startsWith('<svg')));
 await page.click('#btn-add-via');
 await page.fill('#place-via-list .place-input', 'xinyi');
 await page.locator('#place-via-list .place-suggestion').click();
 await page.fill('#place-end', 'tower');
 await page.locator('#place-end + .place-suggestions .place-suggestion').click();
-await page.waitForFunction(() => window.__markerOptions.filter(options =>
-  options.title?.includes('Taipei')).length >= 3);
+await page.waitForFunction(() => {
+  const activeClasses = window.__markerStates.filter(state => state.active)
+    .map(state => state.options?.icon?.className);
+  return activeClasses.filter(name => name?.includes('route-start-marker')).length === 1 &&
+    activeClasses.filter(name => name?.includes('route-end-marker')).length === 1 &&
+    activeClasses.filter(name => name === 'wp-marker').length === 1;
+});
 await page.click('#btn-build-place-route');
 await page.waitForFunction(() => document.querySelector('#place-route-status').textContent
   .includes('Taipei Main Station'),
   null, { timeout: 10000 });
+const activeClasses = await page.evaluate(() => window.__markerStates
+  .filter(state => state.active).map(state => state.options?.icon?.className));
+if (activeClasses.filter(name => name?.includes('route-start-marker')).length !== 1 ||
+    activeClasses.filter(name => name?.includes('route-end-marker')).length !== 1 ||
+    activeClasses.filter(name => name === 'wp-marker').length !== 1) {
+  throw new Error(`built route has duplicate or incorrect markers: ${activeClasses.join(', ')}`);
+}
 
 if (errors.length) throw new Error(`page errors: ${errors.join('\n')}`);
 console.log('address suggestions smoke passed');

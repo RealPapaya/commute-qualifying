@@ -1073,6 +1073,37 @@ body {
     0 8px 18px rgba(0, 0, 0, 0.54);
 }
 
+.route-endpoint-marker {
+  width: 36px !important;
+  height: 44px !important;
+  background: transparent;
+  border: 0;
+  filter: drop-shadow(0 7px 7px rgba(0, 0, 0, 0.48));
+}
+
+.route-endpoint-marker svg {
+  display: block;
+  width: 36px;
+  height: 44px;
+}
+
+.route-endpoint-marker .endpoint-pin {
+  stroke: #f7f8f8;
+  stroke-width: 2;
+}
+
+.route-endpoint-marker .endpoint-symbol {
+  fill: #fff;
+}
+
+.route-start-marker .endpoint-pin {
+  fill: #237443;
+}
+
+.route-end-marker .endpoint-pin {
+  fill: #101317;
+}
+
 .light-icon {
   position: relative;
   width: 18px !important;
