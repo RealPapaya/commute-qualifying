@@ -53,7 +53,15 @@
     <div class="panel">
       <div class="panel-head">
         <h2>My Routes</h2>
-        <button id="btn-new-route" class="btn primary">+ New Route</button>
+        <button id="btn-new-route" class="btn primary" aria-expanded="false">+ New Route</button>
+      </div>
+      <div id="new-route-options" class="new-route-options" hidden>
+        <button class="new-route-choice" data-new-route-mode="plan">
+          <strong>Plan ahead</strong><span>Trace on the map or build from places</span>
+        </button>
+        <button class="new-route-choice" data-new-route-mode="record">
+          <strong>GPS record</strong><span>Drive the route and mark it live</span>
+        </button>
       </div>
       <ul id="route-list" class="route-list"></ul>
       <p class="hint" id="routes-empty">No routes yet. Create one, then trace your commute on the map.</p>
@@ -75,6 +83,18 @@
         <label class="toggle"><input type="checkbox" id="snap-toggle" checked> Snap to roads</label>
       </div>
       <div id="tool-help" class="hint"></div>
+      <section id="gps-recording-panel" class="gps-recording-panel" hidden aria-label="GPS route recording">
+        <p class="gps-recording-copy">Record the route from your current GPS position. Add markers while recording, then stop and save.</p>
+        <div class="toolbar gps-recording-actions">
+          <button id="btn-start-gps-recording" class="btn primary">Start GPS recording</button>
+          <button id="btn-stop-gps-recording" class="btn" hidden>Stop recording</button>
+        </div>
+        <div class="toolbar gps-marker-actions">
+          <button id="btn-record-checkpoint" class="btn" disabled>+ Checkpoint</button>
+          <button id="btn-record-light" class="btn" disabled>+ Light</button>
+        </div>
+        <p id="gps-recording-status" class="hint" role="status" aria-live="polite">Ready to record.</p>
+      </section>
       <form id="place-route-form" class="place-route-form">
         <div class="place-input-row">
           <label for="place-start">起點</label>

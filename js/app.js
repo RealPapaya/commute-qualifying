@@ -53,13 +53,27 @@ document.querySelectorAll('#tabs .tab').forEach(btn => {
   });
 });
 
+const newRouteOptions = $('new-route-options');
+
 $('btn-new-route').addEventListener('click', () => {
+  const opening = newRouteOptions.hidden;
+  newRouteOptions.hidden = !opening;
+  $('btn-new-route').setAttribute('aria-expanded', String(opening));
+});
+
+document.querySelectorAll('[data-new-route-mode]').forEach(button => {
+  button.addEventListener('click', () => createNewRoute(button.dataset.newRouteMode));
+});
+
+function createNewRoute(creationMode) {
   activeRouteId = null;
   editorLoadedId = null; // editor now holds an unsaved route
   enableTabs(true, false);
-  openRoute(null);
+  newRouteOptions.hidden = true;
+  $('btn-new-route').setAttribute('aria-expanded', 'false');
+  openRoute(null, { creationMode });
   showView('editor');
-});
+}
 
 function enableTabs(editor, run) {
   document.querySelector('[data-view="editor"]').disabled = !editor;

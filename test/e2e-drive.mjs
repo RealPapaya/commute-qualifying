@@ -30,6 +30,7 @@ await page.reload();
 
 // ---- 1. new route, frame the map on the commute area ----
 await page.click('#btn-new-route');
+await page.click('[data-new-route-mode="plan"]');
 await page.fill('#route-name', '立德路115號 → 莊泰路1132號');
 await page.evaluate(([a, b]) => {
   window._editorMap.fitBounds(L.latLngBounds([a, b]).pad(0.15));

@@ -8,6 +8,7 @@ import { renderTrackDiagram } from './trackDiagram.js';
 import { saveRoute, getRoute, newId } from './store.js';
 import { addBaseMap } from './baseMap.js';
 import { searchPlace } from './geocode.js';
+import { acceptedRecordingPoint } from './gpsRouteRecorder.js';
 
 const OSRM = 'https://router.project-osrm.org/route/v1/driving/';
 
@@ -17,6 +18,10 @@ let onSaved = null;
 let buildSeq = 0; // stale-response guard for async OSRM rebuilds
 let afterRebuildHandlers = []; // hooks run once the polyline/markers are freshly redrawn
 let placeSearchSeq = 0;
+let recordingWatchId = null, recordingMarker = null;
+let recordingMode = false, lastRecordingPoint = null;
+
+const MIN_RECORDED_CHECKPOINT_M = 50;
 
 const TOOL_HELP = {
   trace: 'Click the map to add waypoints along your commute. Drag a point to move it, double-click a point to delete it.',
@@ -44,6 +49,10 @@ export function initEditor(callbacks) {
   document.getElementById('btn-remove-sector').addEventListener('click', () => changeSectorCount(-1));
   document.getElementById('btn-track-diagram').addEventListener('click', showTrackDiagram);
   document.getElementById('btn-diagram-back').addEventListener('click', hideTrackDiagram);
+  document.getElementById('btn-start-gps-recording').addEventListener('click', startGpsRecording);
+  document.getElementById('btn-stop-gps-recording').addEventListener('click', stopGpsRecording);
+  document.getElementById('btn-record-checkpoint').addEventListener('click', addRecordedCheckpoint);
+  document.getElementById('btn-record-light').addEventListener('click', addRecordedLight);
   document.getElementById('place-route-form').addEventListener('submit', event => {
     event.preventDefault();
     buildRouteFromPlaces();
@@ -77,8 +86,10 @@ export function onAfterRebuild(fn) {
   afterRebuildHandlers.push(fn);
 }
 
-export function openRoute(existing) {
+export function openRoute(existing, { creationMode = 'plan' } = {}) {
+  stopGpsRecording({ quiet: true });
   placeSearchSeq += 1;
+  recordingMode = creationMode === 'record' || existing?.recorded === true;
   route = existing ?? {
     id: newId(),
     name: '',
@@ -89,9 +100,17 @@ export function openRoute(existing) {
     sectorBoundaries: [],
     timingVersion: 1,
   };
+  if (recordingMode && !existing) route.snap = false;
+  lastRecordingPoint = route.recorded ? route.points.at(-1) ?? null : null;
   document.getElementById('route-name').value = route.name;
   resetPlaceInputs();
-  document.getElementById('snap-toggle').checked = route.snap !== false;
+  const snapToggle = document.getElementById('snap-toggle');
+  snapToggle.checked = route.snap !== false;
+  snapToggle.disabled = recordingMode;
+  document.getElementById('gps-recording-panel').hidden = !recordingMode;
+  document.getElementById('place-route-form').hidden = recordingMode;
+  setRecordingStatus(recordingMode ? 'Ready to record.' : '');
+  updateRecordingControls();
   setTool('trace');
   hideTrackDiagram();
   redrawAll();
@@ -191,6 +210,113 @@ async function buildRouteFromPlaces() {
   }
 }
 
+function setRecordingStatus(message) {
+  document.getElementById('gps-recording-status').textContent = message;
+}
+
+function updateRecordingControls() {
+  const recording = recordingWatchId !== null;
+  const start = document.getElementById('btn-start-gps-recording');
+  start.hidden = recording;
+  start.disabled = recording;
+  start.textContent = route?.points?.length ? 'Resume GPS recording' : 'Start GPS recording';
+  document.getElementById('btn-stop-gps-recording').hidden = !recording;
+  const canMark = recording && lastRecordingPoint !== null;
+  document.getElementById('btn-record-checkpoint').disabled = !canMark;
+  document.getElementById('btn-record-light').disabled = !canMark;
+}
+
+// Start the GPS watch directly in the button handler. iOS Safari requires the
+// geolocation request to retain the click's user activation.
+function startGpsRecording() {
+  if (!window.isSecureContext || !navigator.geolocation) {
+    setRecordingStatus('GPS recording needs HTTPS or localhost and location permission.');
+    return;
+  }
+  if (recordingWatchId !== null) return;
+
+  route.snap = false;
+  route.recorded = true;
+  document.getElementById('snap-toggle').checked = false;
+  recordingWatchId = navigator.geolocation.watchPosition(handleRecordingFix, onRecordingGpsError, {
+    enableHighAccuracy: true,
+    maximumAge: 0,
+    timeout: 15000,
+  });
+  setRecordingStatus('Recording — waiting for an accurate GPS fix.');
+  updateRecordingControls();
+}
+
+function handleRecordingFix(position) {
+  const accuracy = Math.round(position.coords.accuracy);
+  const point = acceptedRecordingPoint(lastRecordingPoint, position.coords);
+  if (!point) {
+    setRecordingStatus(`Recording — GPS ±${accuracy} m; waiting for a clearer or farther fix.`);
+    return;
+  }
+
+  route.waypoints.push(point);
+  route.points.push(point);
+  lastRecordingPoint = point;
+  if (!recordingMarker) {
+    recordingMarker = L.circleMarker(point, {
+      radius: 7, color: '#f7f8f8', weight: 2, fillColor: '#e10600', fillOpacity: 0.96,
+      className: 'recording-position-marker',
+    }).addTo(map);
+  } else {
+    recordingMarker.setLatLng(point);
+  }
+  if (route.points.length === 1) map.setView(point, Math.max(map.getZoom(), 16));
+  else map.panTo(point, { animate: false });
+  redrawAll({ notifyAfterRebuild: false });
+  setRecordingStatus(`Recording — ${route.points.length} GPS points, accuracy ±${accuracy} m.`);
+  updateRecordingControls();
+}
+
+function onRecordingGpsError(error) {
+  stopGpsRecording({ quiet: true });
+  const message = error.code === error.PERMISSION_DENIED
+    ? 'GPS permission was denied. Enable location access, then try again.'
+    : 'GPS is temporarily unavailable. Move to a clearer location, then resume recording.';
+  setRecordingStatus(message);
+}
+
+function stopGpsRecording({ quiet = false } = {}) {
+  const wasRecording = recordingWatchId !== null;
+  if (wasRecording) navigator.geolocation.clearWatch(recordingWatchId);
+  recordingWatchId = null;
+  recordingMarker?.remove();
+  recordingMarker = null;
+  if (wasRecording && route) redrawAll();
+  if (!quiet && recordingMode) {
+    setRecordingStatus(`Recording stopped — ${route?.points.length ?? 0} GPS points captured.`);
+  }
+  if (document.getElementById('btn-start-gps-recording')) updateRecordingControls();
+}
+
+function addRecordedCheckpoint() {
+  const cum = getCum();
+  if (!cum || !lastRecordingPoint) return;
+  const distance = cum.at(-1);
+  const previous = route.sectorBoundaries.at(-1) ?? 0;
+  if (distance - previous < MIN_RECORDED_CHECKPOINT_M) {
+    setRecordingStatus(`Drive at least ${MIN_RECORDED_CHECKPOINT_M} m before adding the next checkpoint.`);
+    return;
+  }
+  route.sectorBoundaries.push(distance);
+  refreshSectorSummary();
+  refreshStats();
+  setRecordingStatus(`Checkpoint ${route.sectorBoundaries.length} added at ${(distance / 1000).toFixed(2)} km.`);
+}
+
+function addRecordedLight() {
+  if (!lastRecordingPoint) return;
+  route.lights.push([...lastRecordingPoint]);
+  redrawLights();
+  refreshStats();
+  setRecordingStatus(`Light ${route.lights.length} added at your current recorded position.`);
+}
+
 function flashHelp(msg) {
   const el = document.getElementById('tool-help');
   el.textContent = msg;
@@ -213,8 +339,10 @@ function updateToolActions(tool) {
 }
 
 function onMapClick(e) {
+  if (recordingWatchId !== null) return;
   const p = [e.latlng.lat, e.latlng.lng];
   if (activeTool === 'trace') {
+    route.recorded = false;
     route.waypoints.push(p);
     rebuildGeometry();
   } else if (activeTool === 'light') {
@@ -231,6 +359,7 @@ function undoWaypoint() {
 
 function clearTrace() {
   if (!confirm('Clear the whole trace (waypoints, lights, sectors)?')) return;
+  route.recorded = false;
   route.waypoints = [];
   route.lights = [];
   route.sectorBoundaries = [];
@@ -303,14 +432,14 @@ function getCum() {
   return route.points.length > 1 ? cumulativeDistances(route.points) : null;
 }
 
-function redrawAll() {
+function redrawAll({ notifyAfterRebuild = true } = {}) {
   redrawLine();
   redrawWaypoints();
   redrawLights();
   renderSectorHandles(activeTool === 'sector');
   refreshSectorSummary();
   refreshStats();
-  afterRebuildHandlers.forEach(fn => fn());
+  if (notifyAfterRebuild) afterRebuildHandlers.forEach(fn => fn());
 }
 
 function redrawLine() {
@@ -332,6 +461,10 @@ function redrawLine() {
 
 function redrawWaypoints() {
   wpMarkers.forEach(m => m.remove());
+  if (route.recorded) {
+    wpMarkers = [];
+    return;
+  }
   wpMarkers = route.waypoints.map((p, i) => {
     const m = L.marker(p, {
       draggable: true,
@@ -427,6 +560,10 @@ function refreshTrackDiagram() {
 }
 
 function persist() {
+  if (recordingWatchId !== null) {
+    setRecordingStatus('Stop GPS recording before saving the route.');
+    return;
+  }
   route.name = document.getElementById('route-name').value.trim() || 'Unnamed route';
   if (route.points.length < 2) {
     alert('Trace at least two points before saving.');

@@ -24,6 +24,7 @@ await page.goto('http://localhost:8080/');
 await page.evaluate(() => localStorage.clear());
 await page.reload();
 await page.click('#btn-new-route');
+await page.click('[data-new-route-mode="plan"]');
 await page.fill('#place-start', '起點');
 await page.click('#btn-add-via');
 await page.fill('#place-via-list .place-input', '必經點');
