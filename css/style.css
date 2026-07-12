@@ -789,11 +789,16 @@ body.home-active #topbar {
 }
 
 .editor-route-actions {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 #btn-save-route {
-  order: -1;
+  order: initial;
+}
+
+.editor-stats {
+  margin-top: 6px;
+  margin-bottom: 0;
 }
 
 .sector-summary {
@@ -1283,12 +1288,6 @@ body.home-active #topbar {
   gap: 5px;
 }
 
-.place-route-actions {
-  display: grid;
-  grid-template-columns: 1fr;
-  margin: 0;
-}
-
 #place-route-status:not(:empty) {
   margin: 0;
 }
@@ -1660,8 +1659,7 @@ body.home-active #topbar {
 }
 
 @media (max-width: 430px) {
-  .editor-tool-actions,
-  .editor-route-actions {
+  .editor-tool-actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

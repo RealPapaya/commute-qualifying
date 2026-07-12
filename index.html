@@ -132,7 +132,6 @@
     <div id="editor-map" class="map"></div>
     <div class="panel editor-panel" data-bottom-sheet data-sheet-state="collapsed">
       <button class="sheet-handle" type="button" aria-label="展開控制面板" aria-expanded="false"></button>
-      <div class="panel-head"><span id="route-stats" class="stats"></span></div>
       <div class="editor-options">
         <label class="toggle"><svg class="ui-icon"><use href="#icon-road"></use></svg><input type="checkbox" id="snap-toggle" checked><span data-i18n="snapToRoads">Snap to roads</span></label>
         <label class="toggle"><svg class="ui-icon"><use href="#icon-loop"></use></svg><input type="checkbox" id="closed-loop-toggle"><span data-i18n="closedLoop">閉環賽道（可連續多圈）</span></label>
@@ -165,16 +164,9 @@
           <label for="place-end" data-i18n="end">終點</label>
           <input id="place-end" class="place-input" type="search" placeholder="輸入路名、地址或地標" autocomplete="street-address" data-i18n-placeholder="placePlaceholder">
         </div>
-        <div class="toolbar place-route-actions">
-          <button id="btn-build-place-route" class="btn primary"><svg class="ui-icon"><use href="#icon-build"></use></svg><span data-i18n="buildRoute">依地點規劃路線</span></button>
-        </div>
         <p id="place-route-status" class="hint" role="status" aria-live="polite"></p>
       </form>
       <div id="editor-tool-actions">
-        <div class="toolbar editor-tool-actions" data-tool-actions="trace">
-          <button id="btn-undo-wp" class="btn"><svg class="ui-icon"><use href="#icon-undo"></use></svg><span data-i18n="undoLabel">復原</span></button>
-          <button id="btn-clear-route" class="btn danger"><svg class="ui-icon"><use href="#icon-trash"></use></svg><span data-i18n="clearTrace">Clear trace</span></button>
-        </div>
         <div class="toolbar editor-tool-actions" data-tool-actions="light" hidden>
           <button id="btn-clear-lights" class="btn danger"><svg class="ui-icon"><use href="#icon-trash"></use></svg><span data-i18n="clearLights">Clear lights</span></button>
         </div>
@@ -184,10 +176,13 @@
         </div>
       </div>
       <div class="toolbar editor-route-actions">
-        <button id="btn-track-diagram" class="btn" disabled title="Show F1-style circuit diagram" data-i18n-title="trackDiagramTitle"><svg class="ui-icon"><use href="#icon-diagram"></use></svg><span data-i18n="trackDiagramLabel">賽道圖</span></button>
+        <button id="btn-undo-wp" class="btn"><svg class="ui-icon"><use href="#icon-undo"></use></svg><span data-i18n="undoLabel">復原</span></button>
+        <button id="btn-clear-route" class="btn danger"><svg class="ui-icon"><use href="#icon-trash"></use></svg><span data-i18n="clearTrace">Clear trace</span></button>
         <button id="btn-save-route" class="btn primary"><svg class="ui-icon"><use href="#icon-save"></use></svg><span data-i18n="save">Save</span></button>
+        <button id="btn-track-diagram" class="btn" disabled title="Show F1-style circuit diagram" data-i18n-title="trackDiagramTitle"><svg class="ui-icon"><use href="#icon-diagram"></use></svg><span data-i18n="trackDiagramLabel">賽道圖</span></button>
       </div>
       <div id="sector-summary" class="sector-summary"></div>
+      <div class="panel-head editor-stats"><span id="route-stats" class="stats"></span></div>
     </div>
     <div id="track-diagram-overlay" class="track-diagram-overlay" hidden>
       <div class="track-diagram-head">

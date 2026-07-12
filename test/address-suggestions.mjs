@@ -112,7 +112,7 @@ await page.waitForFunction(() => {
     activeClasses.filter(name => name?.includes('route-end-marker')).length === 1 &&
     activeClasses.filter(name => name === 'wp-marker').length === 1;
 });
-await page.click('#btn-build-place-route');
+await page.locator('#place-end').press('Enter');
 await page.waitForFunction(() => document.querySelector('#place-route-status').textContent
   .includes('Taipei Main Station'),
   null, { timeout: 10000 });

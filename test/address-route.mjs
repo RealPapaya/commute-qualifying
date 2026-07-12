@@ -151,10 +151,9 @@ if (!sectorState.formHidden || sectorState.actionsHidden || sectorState.sectorHi
 await page.click('[data-tool="trace"]');
 const traceState = await page.evaluate(() => ({
   formHidden: document.getElementById('place-route-form').hidden,
-  actionsHidden: document.querySelector('[data-tool-actions="trace"]').hidden,
   sectorHidden: document.getElementById('sector-summary').hidden,
 }));
-if (traceState.formHidden || traceState.actionsHidden || !traceState.sectorHidden) {
+if (traceState.formHidden || !traceState.sectorHidden) {
   throw new Error('trace tool did not restore its route controls');
 }
 

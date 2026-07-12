@@ -27,7 +27,7 @@ const MIN_RECORDED_CHECKPOINT_M = 50;
 const MAX_LIGHT_ROUTE_DISTANCE_M = 30;
 
 const TOOL_HELP = {
-  trace: 'Choose 起點, 終點, or 必經點, then search for an address or tap the map.',
+  trace: '',
   light: 'Click on the map to mark a traffic light. Click a light for Street View / delete.',
   sector: 'Drag the yellow handles along the route to move sector boundaries. Use +/− Sector to add or remove.',
 };
@@ -194,7 +194,8 @@ function resetPlaceInputs() {
   document.getElementById('place-via-list').replaceChildren();
   pendingPlaceInput = null;
   setPlaceStatus('');
-  document.getElementById('btn-build-place-route').disabled = false;
+  const buildButton = document.getElementById('btn-build-place-route');
+  if (buildButton) buildButton.disabled = false;
   updatePlaceControls();
 }
 
@@ -406,7 +407,7 @@ async function buildRouteFromPlaces() {
 
   const seq = ++placeSearchSeq;
   const button = document.getElementById('btn-build-place-route');
-  button.disabled = true;
+  if (button) button.disabled = true;
   try {
     const resolved = [];
     for (const [index, place] of places.entries()) {
@@ -432,7 +433,7 @@ async function buildRouteFromPlaces() {
       setPlaceStatus(`找不到地點，請嘗試更完整的地址或改用地圖點選。${error.message}`);
     }
   } finally {
-    if (seq === placeSearchSeq) button.disabled = false;
+    if (seq === placeSearchSeq && button) button.disabled = false;
   }
 }
 
