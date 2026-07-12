@@ -77,6 +77,7 @@ await page.route('https://router.project-osrm.org/**', route => route.fulfill({
 await page.goto('http://localhost:8080/');
 await page.evaluate(() => localStorage.clear());
 await page.reload();
+await page.click('[data-view="routes"]');
 await page.click('#btn-new-route');
 await page.waitForSelector('#new-route-options:not([hidden])');
 await page.click('[data-new-route-mode="plan"]');
@@ -85,6 +86,41 @@ await page.waitForFunction(() => document.getElementById('view-editor').classLis
 if (await page.locator('[data-place-role]').count() !== 3) {
   throw new Error('expected start, end, and via role buttons');
 }
+await page.evaluate(() => window._editorMap.fire('click', {
+  latlng: { lat: 25.0478, lng: 121.5170 },
+}));
+if (await page.evaluate(() => window.__markerStates.some(state => state.active))) {
+  throw new Error('map click added a route point before a point role was selected');
+}
+
+await page.click('[data-tool="light"]');
+const lightState = await page.evaluate(() => ({
+  formHidden: document.getElementById('place-route-form').hidden,
+  actionsHidden: document.querySelector('[data-tool-actions="light"]').hidden,
+  sectorHidden: document.getElementById('sector-summary').hidden,
+}));
+if (!lightState.formHidden || lightState.actionsHidden || !lightState.sectorHidden) {
+  throw new Error('light tool displayed content belonging to another tool');
+}
+await page.click('[data-tool="sector"]');
+const sectorState = await page.evaluate(() => ({
+  formHidden: document.getElementById('place-route-form').hidden,
+  actionsHidden: document.querySelector('[data-tool-actions="sector"]').hidden,
+  sectorHidden: document.getElementById('sector-summary').hidden,
+}));
+if (!sectorState.formHidden || sectorState.actionsHidden || sectorState.sectorHidden) {
+  throw new Error('sector tool displayed content belonging to another tool');
+}
+await page.click('[data-tool="trace"]');
+const traceState = await page.evaluate(() => ({
+  formHidden: document.getElementById('place-route-form').hidden,
+  actionsHidden: document.querySelector('[data-tool-actions="trace"]').hidden,
+  sectorHidden: document.getElementById('sector-summary').hidden,
+}));
+if (traceState.formHidden || traceState.actionsHidden || !traceState.sectorHidden) {
+  throw new Error('trace tool did not restore its route controls');
+}
+
 await page.click('#btn-place-start');
 if (!await page.locator('#btn-place-end').isDisabled() || !await page.locator('#btn-add-via').isDisabled()) {
   throw new Error('new point buttons should stay locked until the current point is selected');

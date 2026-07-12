@@ -7,18 +7,25 @@ import { showSummary } from './summary.js';
 import { fmtTime } from './timing.js';
 import { cumulativeDistances } from './geo.js';
 import { translate as t } from './i18n.js';
+import { initBottomSheets, collapseBottomSheets } from './bottomSheet.js';
+import { initHomeMap } from './homeMap.js';
 
 const $ = id => document.getElementById(id);
 let activeRouteId = null;
 let lastSummaryRunId = null;
 let runLoadedKey = null;    // routeId:timingVersion currently loaded in the run view
 let editorLoadedId = null;  // routeId currently loaded in the editor
+let homeMapController = null;
 
 function showView(name) {
   document.querySelectorAll('.view').forEach(v =>
     v.classList.toggle('active', v.id === `view-${name}`));
-  document.querySelectorAll('#tabs .tab').forEach(t =>
-    t.classList.toggle('active', t.dataset.view === name));
+  document.querySelectorAll('#tabs .tab').forEach(tab =>
+    tab.classList.toggle('active', tab.dataset.view === name));
+  document.body.classList.toggle('home-active', name === 'home');
+  $('btn-back').hidden = name === 'home';
+  homeMapController?.setActive(name === 'home');
+  collapseBottomSheets();
   if (name === 'editor') { ensureEditorLoaded(); editorInvalidate(); }
   if (name === 'run') { ensureRunLoaded(); runInvalidate(); }
   if (name === 'routes') renderRouteList();
@@ -47,10 +54,13 @@ function ensureRunLoaded() {
   }
 }
 
-document.querySelectorAll('#tabs .tab').forEach(btn => {
-  btn.addEventListener('click', () => {
-    if (btn.disabled) return;
-    showView(btn.dataset.view);
+$('btn-back').addEventListener('click', () => showView('home'));
+$('btn-history').addEventListener('click', () => showView('history'));
+
+document.querySelectorAll('#tabs .tab').forEach(button => {
+  button.addEventListener('click', () => {
+    if (button.disabled) return;
+    showView(button.dataset.view);
   });
 });
 
@@ -223,4 +233,7 @@ initRun({
     showView('editor');
   },
 });
+initBottomSheets();
+homeMapController = initHomeMap();
+homeMapController.setActive(true);
 renderRouteList();

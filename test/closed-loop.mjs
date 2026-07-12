@@ -81,6 +81,7 @@ try {
   await page.evaluate(() => localStorage.clear());
   await page.reload();
 
+  await page.click('[data-view="routes"]');
   await page.click('#btn-new-route');
   await page.waitForSelector('#new-route-options:not([hidden])');
   await page.click('[data-new-route-mode="plan"]');
@@ -96,11 +97,14 @@ try {
   if (!await page.locator('#closed-loop-toggle').isDisabled()) {
     throw new Error('closed-loop toggle should be disabled before endpoints match');
   }
-  await page.evaluate(() => {
-    window._editorMap.fire('click', { latlng: { lat: 25.0, lng: 121.5 } });
-    window._editorMap.fire('click', { latlng: { lat: 25.003, lng: 121.503 } });
-    window._editorMap.fire('click', { latlng: { lat: 25.004, lng: 121.504 } });
-  });
+  await page.click('#btn-place-start');
+  await page.click('[data-map-input="place-start"]');
+  await page.evaluate(() =>
+    window._editorMap.fire('click', { latlng: { lat: 25.0, lng: 121.5 } }));
+  await page.click('#btn-place-end');
+  await page.click('[data-map-input="place-end"]');
+  await page.evaluate(() =>
+    window._editorMap.fire('click', { latlng: { lat: 25.003, lng: 121.503 } }));
   if (!await page.locator('#closed-loop-toggle').isDisabled()) {
     throw new Error('closed-loop toggle enabled while endpoints differ');
   }
@@ -110,6 +114,7 @@ try {
   }
   for (const [lat, lng] of [[25.003, 121.5], [25.003, 121.503]]) {
     await page.click('#btn-add-via');
+    await page.click('#place-via-list .place-input-row:last-child .place-map-pick');
     await page.evaluate(([lat, lng]) =>
       window._editorMap.fire('click', { latlng: { lat, lng } }), [lat, lng]);
   }

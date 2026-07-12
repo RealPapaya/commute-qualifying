@@ -38,9 +38,6 @@ const CLOCK_REFRESH_MS = 16;
 const BOARD_REFRESH_MS = 100;
 const CURSOR_TURN_THRESHOLD_M = 3;
 const DEFAULT_FOLLOW_ZOOM = 18;
-const TRACK_FOLLOW_ZOOM_MIN = 1;
-const TRACK_FOLLOW_ZOOM_MAX = 5;
-const TRACK_FOLLOW_ZOOM_STEP = 0.35;
 const VEHICLE_MODELS = {
   car: `<svg viewBox="0 0 48 48" aria-hidden="true">
     <defs><linearGradient id="car-body" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6ee7ff"/><stop offset="0.55" stop-color="#1976d2"/><stop offset="1" stop-color="#063f82"/></linearGradient></defs>
@@ -75,7 +72,7 @@ const VEHICLE_MODELS = {
 export function initRun(callbacks) {
   onRunSaved = callbacks.onRunSaved;
   onReplanRoute = callbacks.onReplanRoute;
-  map = L.map('run-map').setView([25.04, 121.53], 13);
+  map = L.map('run-map', { zoomControl: false }).setView([25.04, 121.53], 13);
   window._runMap = map; // test hook (e2e driver)
   addBaseMap(map);
 
@@ -85,8 +82,6 @@ export function initRun(callbacks) {
   $('btn-wait-track').addEventListener('click', waitForTrack);
   $('btn-simulate').addEventListener('click', simulate);
   $('btn-follow-user').addEventListener('click', toggleFollowUser);
-  $('btn-follow-zoom-out').addEventListener('click', () => zoomFollow(-1));
-  $('btn-follow-zoom-in').addEventListener('click', () => zoomFollow(1));
   $('run-map-mode').addEventListener('change', () => setMapMode(selectedMapMode(), { resetFilters: true }));
   $('btn-run-diagram-back').addEventListener('click', hideTrackDiagram);
   $('run-diagram-filter-sector-colors').addEventListener('change', refreshTrackDiagram);
@@ -263,26 +258,8 @@ function setFollowUser(enabled, { pan = true } = {}) {
   button.setAttribute('aria-pressed', String(followUser));
   button.textContent = followUser ? '⌖ 跟隨中' : '⌖ 跟隨';
   button.title = followUser ? '停止跟隨位置' : '放大並跟隨位置';
-  updateFollowControls();
   if (followUser && pan && cursorLatLng) followCurrentPosition(cursorLatLng, { zoomOnEnable: true });
   if (mapMode === 'track') refreshTrackDiagram();
-}
-
-function updateFollowControls() {
-  $('btn-follow-zoom-out').disabled = !followUser;
-  $('btn-follow-zoom-in').disabled = !followUser;
-}
-
-function zoomFollow(direction) {
-  if (!followUser) return;
-  if (mapMode === 'street') {
-    map.setZoom(map.getZoom() + direction, { animate: false });
-    if (cursorLatLng) followCurrentPosition(cursorLatLng);
-    return;
-  }
-  trackFollowZoom = Math.max(TRACK_FOLLOW_ZOOM_MIN,
-    Math.min(TRACK_FOLLOW_ZOOM_MAX, trackFollowZoom + direction * TRACK_FOLLOW_ZOOM_STEP));
-  refreshTrackDiagram();
 }
 
 function followCurrentPosition(latLng, { zoomOnEnable = false } = {}) {

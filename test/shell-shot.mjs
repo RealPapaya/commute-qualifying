@@ -65,10 +65,16 @@ const waitForMap = async hook => {
 };
 
 await page.waitForTimeout(400);
+await shot('0-home');
+await page.click('[data-view="routes"]');
 await shot('1-routes');
 
 await page.click('#route-list [data-edit]');
 await waitForMap('_editorMap');
+await shot('2-editor-collapsed');
+await page.click('.editor-panel .sheet-handle');
+await page.waitForSelector('.editor-panel[data-sheet-state="expanded"]');
+await page.waitForTimeout(250);
 await shot('2-editor');
 
 await page.click('#btn-track-diagram');
@@ -77,29 +83,33 @@ await page.waitForTimeout(300);
 await shot('3-track-diagram');
 await page.click('#btn-diagram-back');
 
-await page.click('[data-view="run"]');
+await page.click('#btn-back');
+await page.click('#route-list [data-run]');
 await waitForMap('_runMap');
+await shot('4-run-collapsed');
+const runHandle = await page.locator('.run-panel .sheet-handle').boundingBox();
+await page.mouse.move(runHandle.x + runHandle.width / 2, runHandle.y + runHandle.height / 2);
+await page.mouse.down();
+await page.mouse.move(runHandle.x + runHandle.width / 2, runHandle.y - 120, { steps: 6 });
+await page.mouse.up();
+await page.waitForSelector('.run-panel[data-sheet-state="expanded"]');
+await page.waitForTimeout(250);
 await shot('4-run');
 
-await page.click('[data-view="history"]');
+await page.click('#btn-back');
+await page.click('#btn-history');
 await page.waitForTimeout(400);
 await shot('5-history');
 
-// nav bar geometry, so the reference comparison has numbers behind it
-const nav = await page.evaluate(() => {
-  const n = document.getElementById('tabs');
-  const r = n.getBoundingClientRect();
-  const cs = getComputedStyle(n);
-  const active = document.querySelector('.tab.active');
+const shell = await page.evaluate(() => {
+  const back = document.getElementById('btn-back');
   return {
-    rect: [r.x, r.y, r.width, r.height].map(Math.round),
-    bg: cs.backgroundColor, radius: cs.borderRadius,
-    cells: document.querySelectorAll('#tabs .tab').length,
-    activeLabel: active?.getAttribute('aria-label'),
-    iconsVisible: [...document.querySelectorAll('#tabs .tab svg')].length,
+    bottomNavPresent: Boolean(document.getElementById('tabs')),
+    backVisible: !back.hidden,
+    zoomControls: document.querySelectorAll('.leaflet-control-zoom, .map-follow-zoom').length,
   };
 });
-console.log('nav:', JSON.stringify(nav));
+console.log('shell:', JSON.stringify(shell));
 console.log('pageerrors:', errors.length ? errors : 'none');
 
 await browser.close();

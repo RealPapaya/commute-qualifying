@@ -81,6 +81,7 @@ await page.route('https://router.project-osrm.org/**', route => route.fulfill({
 await page.goto('http://localhost:8080/');
 await page.evaluate(() => localStorage.clear());
 await page.reload();
+await page.click('[data-view="routes"]');
 await page.click('#btn-new-route');
 await page.click('[data-new-route-mode="plan"]');
 

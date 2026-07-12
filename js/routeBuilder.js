@@ -34,7 +34,7 @@ const TOOL_HELP = {
 
 export function initEditor(callbacks) {
   onSaved = callbacks.onSaved;
-  map = L.map('editor-map').setView([25.04, 121.53], 13);
+  map = L.map('editor-map', { zoomControl: false }).setView([25.04, 121.53], 13);
   window._editorMap = map; // test hook (e2e driver)
   addBaseMap(map);
 
@@ -580,6 +580,9 @@ function updateToolActions(tool) {
   document.querySelectorAll('[data-tool-actions]').forEach(group => {
     group.hidden = group.dataset.toolActions !== tool;
   });
+  document.getElementById('place-route-form').hidden = recordingMode || tool !== 'trace';
+  document.getElementById('gps-recording-panel').hidden = !recordingMode || tool !== 'trace';
+  document.getElementById('sector-summary').hidden = tool !== 'sector';
 }
 
 function onMapClick(e) {
@@ -598,14 +601,7 @@ function onMapClick(e) {
       setPlaceStatus('地圖位置已選定，可以加入下一個點。');
       return;
     }
-    route.recorded = false;
-    if (route.waypoints.length < 2) {
-      route.waypoints.push(p);
-    } else {
-      flashHelp('請先按「必經點」，再選擇「點地圖」。');
-      return;
-    }
-    rebuildGeometry();
+    flashHelp('請先選擇「起點」、「終點」或「必經點」，再按「點地圖」。');
   } else if (activeTool === 'light') {
     const projection = projectLightOnRoute(p);
     if (!projection) {
@@ -744,7 +740,15 @@ function redrawWaypoints() {
       icon: waypointIcon(role),
     }).addTo(map);
     m.on('dragend', () => {
-      route.waypoints[i] = [m.getLatLng().lat, m.getLatLng().lng];
+      const point = [m.getLatLng().lat, m.getLatLng().lng];
+      route.waypoints[i] = point;
+      const input = i === 0
+        ? document.getElementById('place-start')
+        : i === route.waypoints.length - 1
+          ? document.getElementById('place-end')
+          : viaInputs()[i - 1];
+      const selected = input && selectedPlaces.get(input);
+      if (selected) selectedPlaces.set(input, { ...selected, point });
       rebuildGeometry();
     });
     m.on('dblclick', () => {

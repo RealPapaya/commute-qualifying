@@ -73,6 +73,7 @@ await page.goto('http://127.0.0.1:8080/');
 await page.evaluate(() => localStorage.clear());
 await page.reload();
 
+await page.click('[data-view="routes"]');
 await page.click('#btn-new-route');
 await page.click('[data-new-route-mode="record"]');
 await page.waitForSelector('#gps-recording-panel:not([hidden])');

@@ -36,6 +36,7 @@ await page.evaluate(() => {
 });
 await page.reload();
 
+await page.click('[data-view="routes"]');
 await page.click('#route-list [data-run]');
 await page.waitForTimeout(1200);
 await page.click('#btn-simulate');
@@ -68,7 +69,8 @@ await page.click('.f1c-close');
 await page.waitForSelector('#summary-overlay', { state: 'hidden', timeout: 4000 });
 console.log('close: ok');
 
-await page.click('[data-view="history"]');
+await page.click('#btn-back');
+await page.click('#btn-history');
 await page.waitForSelector('#summary-overlay .f1c-card', { timeout: 4000 });
 console.log('history tab summary: ok');
 

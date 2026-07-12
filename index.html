@@ -14,8 +14,9 @@
         href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap">
   <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
+<body class="home-active">
   <header id="topbar">
+    <button id="btn-back" class="topbar-back" type="button" aria-label="返回" title="返回" hidden>‹</button>
     <h1><span class="eyebrow">COMMUTE</span><span class="title">QUALIFYING</span></h1>
     <label class="run-picker language-picker">
       <span data-i18n="language">Language</span>
@@ -28,8 +29,8 @@
 
   <!-- Bottom nav. Icon-only, as in the reference; the accessible name carries
        the label. app.js keys off data-view, never the text. -->
-  <nav id="tabs">
-    <button data-view="routes" class="tab active" aria-label="Routes" title="Routes" data-i18n-aria-label="navRoutes" data-i18n-title="navRoutes">
+  <nav id="tabs" aria-label="主要功能">
+    <button data-view="routes" class="tab" aria-label="Routes" title="Routes" data-i18n-aria-label="navRoutes" data-i18n-title="navRoutes">
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M7 21V4"/><path d="M7 5h10l-3 3.5L17 12H7z"/>
       </svg>
@@ -55,12 +56,27 @@
     </button>
   </nav>
 
+  <!-- Full-screen real map. It is intentionally ambient, not a control. -->
+  <section id="view-home" class="view active">
+    <div id="home-map" aria-hidden="true"></div>
+    <div class="home-hero">
+      <div class="home-copy">
+        <span class="home-kicker" data-i18n="homeKicker">CITY IN MOTION / 01</span>
+        <h2 data-i18n="homeTitle">Turn every commute into a qualifying lap.</h2>
+        <p data-i18n="homeCopy">Your streets. Your sectors. A faster line through the everyday.</p>
+      </div>
+    </div>
+  </section>
+
   <!-- Routes list -->
-  <section id="view-routes" class="view active">
+  <section id="view-routes" class="view">
     <div class="panel">
       <div class="panel-head">
         <h2 data-i18n="myRoutes">My Routes</h2>
-        <button id="btn-new-route" class="btn primary" aria-expanded="false" data-i18n="newRoute">+ New Route</button>
+        <div class="panel-head-actions">
+          <button id="btn-history" class="btn" data-i18n="history">Run History &amp; Personal Bests</button>
+          <button id="btn-new-route" class="btn primary" aria-expanded="false" data-i18n="newRoute">+ New Route</button>
+        </div>
       </div>
       <div id="new-route-options" class="new-route-options" hidden>
         <button class="new-route-choice" data-new-route-mode="plan">
@@ -78,7 +94,8 @@
   <!-- Route editor -->
   <section id="view-editor" class="view">
     <div id="editor-map" class="map"></div>
-    <div class="panel editor-panel">
+    <div class="panel editor-panel" data-bottom-sheet data-sheet-state="collapsed">
+      <button class="sheet-handle" type="button" aria-label="展開控制面板" aria-expanded="false"></button>
       <div class="panel-head">
         <input id="route-name" class="name-input" placeholder="Route name" maxlength="40" data-i18n-placeholder="routeName">
         <span id="route-stats" class="stats"></span>
@@ -162,9 +179,7 @@
   <section id="view-run" class="view">
     <div id="run-map" class="map">
       <div class="map-follow-controls" aria-label="跟隨位置控制" data-i18n-aria-label="followControls">
-        <button id="btn-follow-zoom-out" class="map-follow-zoom" type="button" title="縮小" disabled data-i18n-title="zoomOut">−</button>
         <button id="btn-follow-user" class="map-follow-btn" type="button" aria-pressed="false" title="放大並跟隨位置" data-i18n="follow" data-i18n-title="followTitle">⌖ 跟隨</button>
-        <button id="btn-follow-zoom-in" class="map-follow-zoom" type="button" title="放大" disabled data-i18n-title="zoomIn">+</button>
       </div>
       <div id="run-track-diagram-overlay" class="track-diagram-overlay" hidden>
         <div class="track-diagram-head">
@@ -179,7 +194,8 @@
         <div id="run-track-diagram-svg" class="track-diagram-svg"></div>
       </div>
     </div>
-    <div class="panel run-panel">
+    <div class="panel run-panel" data-bottom-sheet data-sheet-state="collapsed">
+      <button class="sheet-handle" type="button" aria-label="展開控制面板" aria-expanded="false"></button>
       <div id="run-status" class="run-status" data-i18n="runStatus">Press ARM, then drive. Timing starts when you cross the start line.</div>
       <div id="offroute-flag" class="offroute-flag" role="alertdialog" aria-live="assertive" aria-labelledby="offroute-title" hidden>
         <div id="offroute-title" class="offroute-title" data-i18n="offRoute">YELLOW FLAG — off route</div>

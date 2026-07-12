@@ -4,6 +4,8 @@ const messages = {
   en: {
     documentTitle: 'Commute Qualifying', language: 'Language', chinese: '中文', english: 'English',
     navRoutes: 'Routes', navEditor: 'Editor', navRun: 'Run', navHistory: 'History',
+    homeKicker: 'CITY IN MOTION / 01', homeTitle: 'Turn every commute into a qualifying lap.',
+    homeCopy: 'Your streets. Your sectors. A faster line through the everyday.',
     myRoutes: 'My Routes', newRoute: '+ New Route', planAhead: 'Plan ahead',
     planAheadDesc: 'Trace on the map or build from places', gpsRecord: 'GPS record',
     gpsRecordDesc: 'Drive the route and mark it live', routesEmpty: 'No routes yet. Create one, then trace your commute on the map.',
@@ -36,6 +38,8 @@ const messages = {
   zh: {
     documentTitle: '通勤排位賽', language: '語言', chinese: '中文', english: 'English',
     navRoutes: '路線', navEditor: '編輯', navRun: '計時', navHistory: '紀錄',
+    homeKicker: '城市動態 / 01', homeTitle: '把每趟通勤，變成你的排位賽。',
+    homeCopy: '你的街道、你的分段，在日常之中跑出更快路線。',
     myRoutes: '我的路線', newRoute: '+ 新增路線', planAhead: '事先規劃',
     planAheadDesc: '在地圖上繪製，或以地點建立路線', gpsRecord: 'GPS 記錄',
     gpsRecordDesc: '實際行駛路線並即時標記', routesEmpty: '還沒有路線。先建立一條路線，再繪製你的通勤路徑。',

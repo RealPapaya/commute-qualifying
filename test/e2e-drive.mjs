@@ -29,6 +29,7 @@ await page.evaluate(() => localStorage.clear());
 await page.reload();
 
 // ---- 1. new route, frame the map on the commute area ----
+await page.click('[data-view="routes"]');
 await page.click('#btn-new-route');
 await page.click('[data-new-route-mode="plan"]');
 await page.fill('#route-name', '立德路115號 → 莊泰路1132號');
@@ -47,12 +48,17 @@ async function clickMap(latlng) {
 const stats = () => page.locator('#route-stats').textContent();
 
 // Place the two endpoints, then explicitly arm each red via point.
+await page.click('#btn-place-start');
+await page.click('[data-map-input="place-start"]');
 await clickMap(START);
 await page.waitForSelector('.route-start-marker');
+await page.click('#btn-place-end');
+await page.click('[data-map-input="place-end"]');
 await clickMap(END);
 await page.waitForSelector('.route-end-marker');
 for (let i = 0; i < [WP1, WP2].length; i++) {
   await page.click('#btn-add-via');
+  await page.click('#place-via-list .place-input-row:last-child .place-map-pick');
   await clickMap([WP1, WP2][i]);
   await page.waitForFunction(n =>
     document.querySelectorAll('.wp-marker').length === n, i + 1,
@@ -181,7 +187,8 @@ await simulateLap('7-lap1');
 await simulateLap('8-lap2'); // vs PB: mix of purple/green/yellow
 
 // ---- 7. history ----
-await page.click('[data-view="history"]');
+await page.click('#btn-back');
+await page.click('#btn-history');
 await shot('9-history');
 
 console.log('pageerrors:', errors.length ? errors : 'none');

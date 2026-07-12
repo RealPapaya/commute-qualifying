@@ -116,15 +116,13 @@ body {
   letter-spacing: -0.2px;
 }
 
-/* --- bottom nav (traced off the reference: black pill, hairline dividers,
-       white underline on the active cell) --- */
+/* --- bottom nav --- */
 
 #tabs {
   position: fixed;
   left: 12px;
   right: 12px;
   bottom: calc(10px + env(safe-area-inset-bottom));
-  /* Below .summary-overlay (6000) so the finish card is never split by it. */
   z-index: 5000;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -152,7 +150,6 @@ body {
   letter-spacing: 0;
 }
 
-/* hairline divider between cells */
 .tab + .tab::before {
   content: "";
   position: absolute;
@@ -180,7 +177,6 @@ body {
   box-shadow: none;
 }
 
-/* the underline on the active cell */
 .tab.active::after {
   content: "";
   position: absolute;
@@ -197,6 +193,25 @@ body {
   cursor: default;
 }
 
+.topbar-back {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  width: 42px;
+  height: 42px;
+  transform: translateY(-50%);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.26);
+  color: #fff;
+  cursor: pointer;
+  font: 400 34px/1 system-ui, sans-serif;
+}
+
+.topbar-back[hidden] {
+  display: none;
+}
+
 .view {
   display: none;
   flex: 1;
@@ -207,6 +222,97 @@ body {
 
 .view.active {
   display: flex;
+}
+
+/* --- full-screen home map --- */
+
+body.home-active { padding-bottom: 0; }
+
+body.home-active #topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(180deg, rgba(7, 8, 10, 0.78), transparent);
+}
+
+#view-home {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  color: #fff;
+  background: #101317;
+}
+
+#home-map {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  user-select: none;
+  filter: saturate(0.72) contrast(1.08) brightness(0.74);
+}
+
+.home-course-casing,
+.home-course-line {
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.home-course-line {
+  filter: drop-shadow(0 0 5px rgba(255, 53, 47, 0.72));
+}
+
+#view-home::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 400;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(6, 7, 9, 0.1) 35%, rgba(6, 7, 9, 0.82) 100%),
+    radial-gradient(circle at 78% 18%, transparent 0 30%, rgba(6, 7, 9, 0.24) 72%);
+}
+
+.home-hero {
+  position: absolute;
+  z-index: 500;
+  left: clamp(18px, 5vw, 64px);
+  right: clamp(18px, 5vw, 64px);
+  bottom: calc(var(--nav-height) + 32px + env(safe-area-inset-bottom));
+  pointer-events: none;
+}
+
+.home-copy { width: min(720px, 100%); }
+
+.home-kicker {
+  display: block;
+  margin-bottom: 10px;
+  color: #ff6a63;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 2.4px;
+}
+
+.home-copy h2 {
+  max-width: 700px;
+  color: #fff;
+  font-size: clamp(34px, 6vw, 74px);
+  font-weight: 900;
+  font-variation-settings: 'wdth' 112;
+  line-height: 0.94;
+  letter-spacing: -0.045em;
+  text-shadow: 0 8px 34px rgba(0, 0, 0, 0.4);
+  text-wrap: balance;
+}
+
+.home-copy p {
+  max-width: 540px;
+  margin-top: 14px;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: clamp(12px, 1.6vw, 16px);
+  font-weight: 500;
+  line-height: 1.45;
 }
 
 .map {
@@ -452,15 +558,32 @@ body {
   box-shadow: 0 -18px 42px rgba(0, 0, 0, 0.32);
 }
 
-.editor-panel::before,
-.run-panel::before {
-  content: "";
+.sheet-handle {
+  position: relative;
   display: block;
+  width: 100%;
+  height: 24px;
+  margin: -8px 0 4px;
+  border: 0;
+  background: transparent;
+  cursor: grab;
+  touch-action: none;
+}
+
+.sheet-handle::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 10px;
   width: 42px;
   height: 4px;
-  margin: 0 auto 12px;
+  transform: translateX(-50%);
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.2);
+}
+
+.sheet-handle:active {
+  cursor: grabbing;
 }
 
 #editor-toolbar {
@@ -800,6 +923,13 @@ body {
 .leaflet-container {
   background: #f7f5ef;
   font-family: 'Archivo', system-ui, sans-serif;
+}
+
+.panel-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .new-route-options {
@@ -1163,7 +1293,7 @@ body {
   inset: 0;
   /* Must clear .editor-panel / .run-panel (2101), or on the stacked mobile
      layout the panel paints over the diagram and hides its centred track.
-     Stays under #tabs (5000) and .summary-overlay (6000). */
+     Stays under .summary-overlay (6000). */
   z-index: 2200;
   background:
     radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.10), transparent 52%),
@@ -1287,16 +1417,32 @@ body {
 
   #view-editor .map,
   #view-run .map {
-    flex: 1 1 44dvh;
-    min-height: 32dvh;
+    flex: 1;
+    min-height: 0;
   }
 
   .editor-panel,
   .run-panel {
-    flex: 0 0 auto;
-    max-height: calc(100dvh - 64px - var(--nav-height) - 32dvh - env(safe-area-inset-bottom));
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: min(46dvh, calc(100% - 72px));
     padding: 12px 14px 16px;
     overflow-y: auto;
+    transform: translateY(var(--sheet-drag-offset, calc(100% - 48px)));
+    transition: transform 180ms ease;
+    will-change: transform;
+  }
+
+  .editor-panel[data-sheet-state="expanded"],
+  .run-panel[data-sheet-state="expanded"] {
+    transform: translateY(var(--sheet-drag-offset, 0));
+  }
+
+  .editor-panel[data-dragging],
+  .run-panel[data-dragging] {
+    transition: none;
   }
 
   .panel-head {
@@ -1396,8 +1542,7 @@ body {
     padding-bottom: calc(var(--nav-height) + 24px);
   }
 
-  .editor-panel::before,
-  .run-panel::before {
+  .sheet-handle {
     display: none;
   }
 
