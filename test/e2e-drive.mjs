@@ -17,6 +17,15 @@ const browser = await chromium.launch({ channel: 'msedge', headless: true });
 const page = await browser.newPage({ viewport: { width: 1380, height: 900 } });
 const errors = [];
 page.on('pageerror', e => errors.push(String(e)));
+await page.route('https://nominatim.openstreetmap.org/reverse**', async route => {
+  const url = new URL(route.request().url());
+  const lat = url.searchParams.get('lat');
+  const lon = url.searchParams.get('lon');
+  await route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ lat, lon, display_name: `測試地址 ${lat}, ${lon}` }),
+  });
+});
 
 const shot = async name => {
   await page.waitForTimeout(1500); // let tiles settle
@@ -49,16 +58,13 @@ const stats = () => page.locator('#route-stats').textContent();
 
 // Place the two endpoints, then explicitly arm each red via point.
 await page.click('#btn-place-start');
-await page.click('[data-map-input="place-start"]');
 await clickMap(START);
 await page.waitForSelector('.route-start-marker');
 await page.click('#btn-place-end');
-await page.click('[data-map-input="place-end"]');
 await clickMap(END);
 await page.waitForSelector('.route-end-marker');
 for (let i = 0; i < [WP1, WP2].length; i++) {
   await page.click('#btn-add-via');
-  await page.click('#place-via-list .place-input-row:last-child .place-map-pick');
   await clickMap([WP1, WP2][i]);
   await page.waitForFunction(n =>
     document.querySelectorAll('.wp-marker').length === n, i + 1,

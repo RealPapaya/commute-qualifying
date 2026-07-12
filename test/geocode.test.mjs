@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parsePlace, parsePlaces, searchPlace, searchPlaces } from '../js/geocode.js';
+import { parsePlace, parsePlaces, parseReversePlace, reversePlace,
+         searchPlace, searchPlaces } from '../js/geocode.js';
 
 test('parsePlace: returns the first result with valid coordinates', () => {
   const place = parsePlace([
@@ -16,6 +17,18 @@ test('parsePlace: returns the first result with valid coordinates', () => {
 test('parsePlace: rejects no-match and out-of-range responses', () => {
   assert.throws(() => parsePlace([]));
   assert.throws(() => parsePlace([{ lat: '91', lon: '121.5' }]));
+});
+
+test('parseReversePlace: returns one address result', () => {
+  assert.deepEqual(parseReversePlace({
+    lat: '25.0478', lon: '121.5170', name: '忠孝西路一段',
+    display_name: '忠孝西路一段, 中正區, 臺北市',
+  }), {
+    point: [25.0478, 121.517],
+    name: '忠孝西路一段',
+    detail: '中正區, 臺北市',
+  });
+  assert.throws(() => parseReversePlace({ error: 'Unable to geocode' }));
 });
 
 test('searchPlace: sends the entered query and parses the response', async () => {
@@ -52,6 +65,25 @@ test('searchPlaces: returns valid suggestions and requests five matches', async 
     { point: [25.033, 121.5654], name: 'Taipei City Hall' },
   ]);
   assert.deepEqual(parsePlaces([{ lat: '91', lon: '121.5' }]), []);
+});
+
+test('reversePlace: sends map coordinates and parses the address', async () => {
+  let requestedUrl;
+  const result = await reversePlace([25.0478, 121.517], async url => {
+    requestedUrl = new URL(url);
+    return {
+      ok: true,
+      json: async () => ({
+        lat: '25.0478', lon: '121.5170', name: '忠孝西路一段',
+        display_name: '忠孝西路一段, 中正區, 臺北市',
+      }),
+    };
+  });
+  assert.equal(requestedUrl.pathname, '/reverse');
+  assert.equal(requestedUrl.searchParams.get('lat'), '25.0478');
+  assert.equal(requestedUrl.searchParams.get('lon'), '121.517');
+  assert.equal(result.name, '忠孝西路一段');
+  assert.equal(result.detail, '中正區, 臺北市');
 });
 
 test('parsePlaces: prioritizes exact local matches and removes duplicate pins', () => {

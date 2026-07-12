@@ -15,16 +15,45 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="home-active">
+  <svg class="svg-sprite" aria-hidden="true">
+    <symbol id="icon-route" viewBox="0 0 24 24"><path d="M6 19a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm12-8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM8.5 15.5l7-7"/></symbol>
+    <symbol id="icon-light" viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="3"/><circle cx="12" cy="7" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="17" r="1.5"/></symbol>
+    <symbol id="icon-sector" viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6M12 5V2"/></symbol>
+    <symbol id="icon-road" viewBox="0 0 24 24"><path d="M8 21 10 3M16 21 14 3M12 5v3m0 3v3m0 3v2"/></symbol>
+    <symbol id="icon-loop" viewBox="0 0 24 24"><path d="M19 7a8 8 0 1 0 1 7M19 3v4h-4"/></symbol>
+    <symbol id="icon-start" viewBox="0 0 24 24"><path d="M12 22s7-6.1 7-13a7 7 0 1 0-14 0c0 6.9 7 13 7 13Z"/><path d="m10 7 5 3-5 3Z"/></symbol>
+    <symbol id="icon-finish" viewBox="0 0 24 24"><path d="M6 21V4m0 1h11l-2 4 2 4H6"/><path d="M6 5h4v4H6m4 0h4v4h-4m4-8h3v4h-3"/></symbol>
+    <symbol id="icon-via" viewBox="0 0 24 24"><circle cx="10" cy="12" r="5"/><path d="M10 9v6m-3-3h6M18 5v14"/></symbol>
+    <symbol id="icon-undo" viewBox="0 0 24 24"><path d="m9 7-5 5 5 5M5 12h8a6 6 0 0 1 6 6"/></symbol>
+    <symbol id="icon-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 3h6l1 4H8l1-4Zm-2 4 1 14h8l1-14M10 11v6m4-6v6"/></symbol>
+    <symbol id="icon-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="icon-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="icon-diagram" viewBox="0 0 24 24"><path d="M5 19c2-5 1-11 6-14 4-2 8 1 8 5 0 5-5 9-10 9H5Z"/><path d="M8 16c2-3 1-7 4-8 2-1 4 1 4 3 0 3-3 5-6 5H8Z"/></symbol>
+    <symbol id="icon-save" viewBox="0 0 24 24"><path d="M4 3h13l3 3v15H4V3Z"/><path d="M8 3v6h8V3M8 21v-7h8v7"/></symbol>
+    <symbol id="icon-build" viewBox="0 0 24 24"><path d="M5 19 19 5M9 5h10v10"/></symbol>
+    <symbol id="icon-gps" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/></symbol>
+    <symbol id="icon-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1"/></symbol>
+  </svg>
   <header id="topbar">
-    <button id="btn-back" class="topbar-back" type="button" aria-label="返回" title="返回" hidden>‹</button>
+    <button id="btn-back" class="topbar-back" type="button" aria-label="返回" title="返回" hidden>←</button>
     <h1><span class="eyebrow">COMMUTE</span><span class="title">QUALIFYING</span></h1>
-    <label class="run-picker language-picker">
-      <span data-i18n="language">Language</span>
-      <select id="language-select" aria-label="Language" data-i18n-aria-label="language">
-        <option value="zh" data-i18n="chinese">中文</option>
-        <option value="en" data-i18n="english">English</option>
-      </select>
-    </label>
+    <details class="settings-menu">
+      <summary class="settings-button" aria-label="設定 / Settings" title="設定 / Settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6 1.7 1.7 0 0 0 10 3v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1z"></path>
+        </svg>
+      </summary>
+      <div class="settings-panel">
+        <label class="run-picker language-picker">
+          <span data-i18n="language">Language</span>
+          <select id="language-select" aria-label="Language" data-i18n-aria-label="language">
+            <option value="zh" data-i18n="chinese">中文</option>
+            <option value="en" data-i18n="english">English</option>
+          </select>
+        </label>
+      </div>
+    </details>
   </header>
 
   <!-- Bottom nav. Icon-only, as in the reference; the accessible name carries
@@ -101,18 +130,20 @@
         <span id="route-stats" class="stats"></span>
       </div>
       <div class="toolbar" id="editor-toolbar">
-        <button data-tool="trace" class="btn tool active" title="Click map to add waypoints" data-i18n="trace" data-i18n-title="traceTitle">✏️ Trace</button>
-        <button data-tool="light" class="btn tool" title="Click route to mark a traffic light" data-i18n="lights" data-i18n-title="lightsTitle">🚦 Lights</button>
-        <button data-tool="sector" class="btn tool" title="Drag sector boundaries along the route" data-i18n="sectors" data-i18n-title="sectorsTitle">⏱ Sectors</button>
-        <label class="toggle"><input type="checkbox" id="snap-toggle" checked><span data-i18n="snapToRoads">Snap to roads</span></label>
-        <label class="toggle"><input type="checkbox" id="closed-loop-toggle"><span data-i18n="closedLoop">閉環賽道（可連續多圈）</span></label>
+        <button data-tool="trace" class="btn tool active" title="Click map to add waypoints" data-i18n-title="traceTitle"><svg class="ui-icon"><use href="#icon-route"></use></svg><span data-i18n="traceLabel">路線</span></button>
+        <button data-tool="light" class="btn tool" title="Click route to mark a traffic light" data-i18n-title="lightsTitle"><svg class="ui-icon"><use href="#icon-light"></use></svg><span data-i18n="lightsLabel">號誌</span></button>
+        <button data-tool="sector" class="btn tool" title="Drag sector boundaries along the route" data-i18n-title="sectorsTitle"><svg class="ui-icon"><use href="#icon-sector"></use></svg><span data-i18n="sectorsLabel">分段</span></button>
+        <div class="editor-options">
+          <label class="toggle"><svg class="ui-icon"><use href="#icon-road"></use></svg><input type="checkbox" id="snap-toggle" checked><span data-i18n="snapToRoads">Snap to roads</span></label>
+          <label class="toggle"><svg class="ui-icon"><use href="#icon-loop"></use></svg><input type="checkbox" id="closed-loop-toggle"><span data-i18n="closedLoop">閉環賽道（可連續多圈）</span></label>
+        </div>
       </div>
       <div id="tool-help" class="hint"></div>
       <section id="gps-recording-panel" class="gps-recording-panel" hidden aria-label="GPS route recording" data-i18n-aria-label="gpsRecording">
         <p class="gps-recording-copy" data-i18n="gpsRecordingCopy">Record the route from your current GPS position. Add markers while recording, then stop and save.</p>
         <div class="toolbar gps-recording-actions">
-          <button id="btn-start-gps-recording" class="btn primary" data-i18n="startGps">Start GPS recording</button>
-          <button id="btn-stop-gps-recording" class="btn" hidden data-i18n="stopGps">Stop recording</button>
+          <button id="btn-start-gps-recording" class="btn primary"><svg class="ui-icon"><use href="#icon-gps"></use></svg><span data-i18n="startGps">Start GPS recording</span></button>
+          <button id="btn-stop-gps-recording" class="btn" hidden><svg class="ui-icon"><use href="#icon-stop"></use></svg><span data-i18n="stopGps">Stop recording</span></button>
         </div>
         <div class="toolbar gps-marker-actions">
           <button id="btn-record-checkpoint" class="btn" disabled data-i18n="checkpoint">+ Checkpoint</button>
@@ -122,42 +153,40 @@
       </section>
       <form id="place-route-form" class="place-route-form">
         <div class="place-role-actions" aria-label="新增路徑點">
-          <button id="btn-place-start" type="button" class="btn place-role-btn" data-place-role="start">起點</button>
-          <button id="btn-place-end" type="button" class="btn place-role-btn" data-place-role="end">終點</button>
-          <button id="btn-add-via" type="button" class="btn place-role-btn" data-place-role="via">必經點</button>
+          <button id="btn-place-start" type="button" class="btn place-role-btn" data-place-role="start"><svg class="ui-icon"><use href="#icon-start"></use></svg><span data-i18n="start">起點</span></button>
+          <button id="btn-place-end" type="button" class="btn place-role-btn" data-place-role="end"><svg class="ui-icon"><use href="#icon-finish"></use></svg><span data-i18n="end">終點</span></button>
+          <button id="btn-add-via" type="button" class="btn place-role-btn" data-place-role="via"><svg class="ui-icon"><use href="#icon-via"></use></svg><span data-i18n="viaLabel">必經點</span></button>
         </div>
         <div class="place-input-row" data-place-row="start" hidden>
           <label for="place-start" data-i18n="start">起點</label>
           <input id="place-start" class="place-input" type="search" placeholder="輸入路名、地址或地標" autocomplete="street-address" data-i18n-placeholder="placePlaceholder">
-          <button type="button" class="btn place-map-pick" data-map-input="place-start">點地圖</button>
         </div>
         <div id="place-via-list" class="place-via-list"></div>
         <div class="place-input-row" data-place-row="end" hidden>
           <label for="place-end" data-i18n="end">終點</label>
           <input id="place-end" class="place-input" type="search" placeholder="輸入路名、地址或地標" autocomplete="street-address" data-i18n-placeholder="placePlaceholder">
-          <button type="button" class="btn place-map-pick" data-map-input="place-end">點地圖</button>
         </div>
         <div class="toolbar place-route-actions">
-          <button id="btn-build-place-route" class="btn primary" data-i18n="buildRoute">依地點規劃路線</button>
+          <button id="btn-build-place-route" class="btn primary"><svg class="ui-icon"><use href="#icon-build"></use></svg><span data-i18n="buildRoute">依地點規劃路線</span></button>
         </div>
         <p id="place-route-status" class="hint" role="status" aria-live="polite"></p>
       </form>
       <div id="editor-tool-actions">
         <div class="toolbar editor-tool-actions" data-tool-actions="trace">
-          <button id="btn-undo-wp" class="btn" data-i18n="undo">↩ Undo point</button>
-          <button id="btn-clear-route" class="btn danger" data-i18n="clearTrace">Clear trace</button>
+          <button id="btn-undo-wp" class="btn"><svg class="ui-icon"><use href="#icon-undo"></use></svg><span data-i18n="undoLabel">復原</span></button>
+          <button id="btn-clear-route" class="btn danger"><svg class="ui-icon"><use href="#icon-trash"></use></svg><span data-i18n="clearTrace">Clear trace</span></button>
         </div>
         <div class="toolbar editor-tool-actions" data-tool-actions="light" hidden>
-          <button id="btn-clear-lights" class="btn danger" data-i18n="clearLights">Clear lights</button>
+          <button id="btn-clear-lights" class="btn danger"><svg class="ui-icon"><use href="#icon-trash"></use></svg><span data-i18n="clearLights">Clear lights</span></button>
         </div>
         <div class="toolbar editor-tool-actions" data-tool-actions="sector" hidden>
-          <button id="btn-add-sector" class="btn" data-i18n="addSector">+ Sector</button>
-          <button id="btn-remove-sector" class="btn" data-i18n="removeSector">− Sector</button>
+          <button id="btn-add-sector" class="btn"><svg class="ui-icon"><use href="#icon-plus"></use></svg><span data-i18n="sectorLabel">分段</span></button>
+          <button id="btn-remove-sector" class="btn"><svg class="ui-icon"><use href="#icon-minus"></use></svg><span data-i18n="sectorLabel">分段</span></button>
         </div>
       </div>
       <div class="toolbar editor-route-actions">
-        <button id="btn-track-diagram" class="btn" disabled title="Show F1-style circuit diagram" data-i18n="trackDiagram" data-i18n-title="trackDiagramTitle">🏁 賽道圖</button>
-        <button id="btn-save-route" class="btn primary" data-i18n="save">Save</button>
+        <button id="btn-track-diagram" class="btn" disabled title="Show F1-style circuit diagram" data-i18n-title="trackDiagramTitle"><svg class="ui-icon"><use href="#icon-diagram"></use></svg><span data-i18n="trackDiagramLabel">賽道圖</span></button>
+        <button id="btn-save-route" class="btn primary"><svg class="ui-icon"><use href="#icon-save"></use></svg><span data-i18n="save">Save</span></button>
       </div>
       <div id="sector-summary" class="sector-summary"></div>
     </div>

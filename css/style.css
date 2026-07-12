@@ -116,6 +116,78 @@ body {
   letter-spacing: -0.2px;
 }
 
+.svg-sprite {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.ui-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.settings-menu {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.settings-button {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  list-style: none;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius);
+  background: rgba(0, 0, 0, 0.26);
+  color: #fff;
+  cursor: pointer;
+}
+
+.settings-button::-webkit-details-marker {
+  display: none;
+}
+
+.settings-button svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.settings-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 180px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+body:not(.home-active) {
+  --nav-height: 0px;
+}
+
+body:not(.home-active) #tabs {
+  display: none;
+}
+
 /* --- bottom nav --- */
 
 #tabs {
@@ -201,11 +273,11 @@ body {
   height: 42px;
   transform: translateY(-50%);
   border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 50%;
+  border-radius: var(--radius);
   background: rgba(0, 0, 0, 0.26);
   color: #fff;
   cursor: pointer;
-  font: 400 34px/1 system-ui, sans-serif;
+  font: 500 22px/1 system-ui, sans-serif;
 }
 
 .topbar-back[hidden] {
@@ -558,6 +630,47 @@ body.home-active #topbar {
   box-shadow: 0 -18px 42px rgba(0, 0, 0, 0.32);
 }
 
+.editor-panel {
+  padding: 10px 12px 12px;
+}
+
+.editor-panel .panel-head {
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.editor-panel .name-input,
+.editor-panel .stats {
+  min-height: 30px;
+  padding: 4px 7px;
+}
+
+.editor-panel .toolbar {
+  gap: 5px;
+  margin: 6px 0;
+}
+
+.editor-panel .hint {
+  margin: 3px 0;
+}
+
+#tool-help {
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editor-panel .btn {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 4px 8px;
+  letter-spacing: 0;
+}
+
 .sheet-handle {
   position: relative;
   display: block;
@@ -597,11 +710,11 @@ body.home-active #topbar {
 }
 
 #editor-toolbar .btn.tool {
-  min-height: 42px;
+  min-height: 30px;
   border: 0;
   background: transparent;
   color: var(--dim);
-  padding: 0 8px;
+  padding: 3px 7px;
   white-space: nowrap;
 }
 
@@ -612,13 +725,27 @@ body.home-active #topbar {
   box-shadow: none;
 }
 
-#editor-toolbar .toggle {
+.editor-options {
   grid-column: 1 / -1;
-  min-height: 38px;
-  justify-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   border-top: 1px solid var(--hairline);
   margin-top: 2px;
-  padding-top: 2px;
+  padding: 4px 3px 1px;
+}
+
+#editor-toolbar .toggle {
+  min-height: 24px;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+#editor-toolbar .toggle .ui-icon {
+  width: 14px;
+  height: 14px;
+  flex-basis: 14px;
 }
 
 .editor-tool-actions,
@@ -636,7 +763,7 @@ body.home-active #topbar {
 }
 
 .editor-route-actions {
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 #btn-save-route {
@@ -976,19 +1103,26 @@ body.home-active #topbar {
 
 .place-route-form {
   display: grid;
-  gap: 7px;
-  margin: 10px 0;
+  gap: 5px;
+  margin: 6px 0;
 }
 
 .place-role-actions {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 7px;
+  gap: 5px;
 }
 
 .place-role-btn {
-  min-height: 42px;
+  min-height: 30px;
+  padding: 3px 7px;
   font-weight: 700;
+}
+
+.place-role-btn.active {
+  border-color: var(--bar);
+  background: var(--bar);
+  color: #fff;
 }
 
 .place-role-btn.complete {
@@ -1021,9 +1155,9 @@ body.home-active #topbar {
 
 .place-input-row {
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr) auto;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 7px;
+  gap: 5px;
 }
 
 .place-input-row label {
@@ -1035,8 +1169,8 @@ body.home-active #topbar {
 .place-input {
   width: 100%;
   min-width: 0;
-  min-height: 40px;
-  padding: 7px 9px;
+  min-height: 42px;
+  padding: 7px 10px;
   font-size: 13px;
 }
 
@@ -1091,12 +1225,12 @@ body.home-active #topbar {
 
 .place-via-list {
   display: grid;
-  gap: 7px;
+  gap: 5px;
 }
 
 .place-remove {
-  min-height: 40px;
-  padding: 6px 8px;
+  min-height: 30px;
+  padding: 3px 7px;
 }
 
 .place-row-actions {
@@ -1108,12 +1242,6 @@ body.home-active #topbar {
   display: grid;
   grid-template-columns: 1fr;
   margin: 0;
-}
-
-.place-map-pick.active {
-  border-color: var(--bar);
-  background: var(--bar);
-  color: #fff;
 }
 
 #place-route-status:not(:empty) {
@@ -1435,6 +1563,10 @@ body.home-active #topbar {
     will-change: transform;
   }
 
+  .editor-panel {
+    padding: 10px 12px 12px;
+  }
+
   .editor-panel[data-sheet-state="expanded"],
   .run-panel[data-sheet-state="expanded"] {
     transform: translateY(var(--sheet-drag-offset, 0));
@@ -1485,11 +1617,15 @@ body.home-active #topbar {
 @media (max-width: 430px) {
   .editor-tool-actions,
   .editor-route-actions {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   #editor-toolbar .btn.tool {
-    font-size: 12px;
+    font-size: 11px;
+  }
+
+  #editor-toolbar .toggle {
+    font-size: 10px;
   }
 
   .run-options {
@@ -1539,7 +1675,7 @@ body.home-active #topbar {
     border-left: 1px solid var(--hairline);
     border-radius: 0;
     box-shadow: -18px 0 42px rgba(0, 0, 0, 0.2);
-    padding-bottom: calc(var(--nav-height) + 24px);
+    padding-bottom: calc(var(--nav-height) + 14px);
   }
 
   .sheet-handle {

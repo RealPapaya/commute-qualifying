@@ -1,6 +1,7 @@
 // Keyless place search for the route editor. The browser calls Nominatim
 // directly, so callers keep requests sequential and show their own progress.
 const NOMINATIM = 'https://nominatim.openstreetmap.org/search';
+const NOMINATIM_REVERSE = 'https://nominatim.openstreetmap.org/reverse';
 
 function placeFromResult(result) {
   if (result?.lat === '' || result?.lat == null || result?.lon === '' || result?.lon == null) {
@@ -39,6 +40,12 @@ function matchRank(result, query) {
 export function parsePlace(results) {
   const place = (results ?? []).map(placeFromResult).find(Boolean);
   if (!place) throw new Error('沒有符合的搜尋結果。');
+  return place;
+}
+
+export function parseReversePlace(result) {
+  const place = placeFromResult(result);
+  if (!place) throw new Error('找不到這個地圖位置的地址。');
   return place;
 }
 
@@ -88,4 +95,23 @@ export async function searchPlaces(query, fetcher = fetch) {
   });
   if (!response.ok) throw new Error('地點搜尋服務暫時無法使用。');
   return parsePlaces(await response.json(), term);
+}
+
+export async function reversePlace(point, fetcher = fetch) {
+  const [lat, lon] = point ?? [];
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) throw new Error('地圖位置無效。');
+  const params = new URLSearchParams({
+    format: 'jsonv2',
+    lat: String(lat),
+    lon: String(lon),
+    'accept-language': 'zh-TW',
+    addressdetails: '1',
+    namedetails: '1',
+    layer: 'address',
+  });
+  const response = await fetcher(`${NOMINATIM_REVERSE}?${params}`, {
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!response.ok) throw new Error('地址查詢服務暫時無法使用。');
+  return parseReversePlace(await response.json());
 }

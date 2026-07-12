@@ -32,6 +32,7 @@ await page.addInitScript(() => {
       return fakeMap;
     },
     setView: () => fakeMap,
+    flyTo: () => fakeMap,
     panTo: () => fakeMap,
     fitBounds: () => fakeMap,
     invalidateSize: () => fakeMap,
@@ -75,6 +76,15 @@ await page.addInitScript(() => {
     state.handlers.dragend();
   };
 });
+await page.route('https://nominatim.openstreetmap.org/reverse**', async route => {
+  const url = new URL(route.request().url());
+  const lat = url.searchParams.get('lat');
+  const lon = url.searchParams.get('lon');
+  await route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ lat, lon, display_name: `測試地址 ${lat}, ${lon}` }),
+  });
+});
 
 try {
   await page.goto('http://127.0.0.1:8080/');
@@ -98,13 +108,13 @@ try {
     throw new Error('closed-loop toggle should be disabled before endpoints match');
   }
   await page.click('#btn-place-start');
-  await page.click('[data-map-input="place-start"]');
   await page.evaluate(() =>
     window._editorMap.fire('click', { latlng: { lat: 25.0, lng: 121.5 } }));
+  await page.waitForFunction(() => document.getElementById('place-start').value.includes('測試地址'));
   await page.click('#btn-place-end');
-  await page.click('[data-map-input="place-end"]');
   await page.evaluate(() =>
     window._editorMap.fire('click', { latlng: { lat: 25.003, lng: 121.503 } }));
+  await page.waitForFunction(() => document.getElementById('place-end').value.includes('測試地址'));
   if (!await page.locator('#closed-loop-toggle').isDisabled()) {
     throw new Error('closed-loop toggle enabled while endpoints differ');
   }
@@ -114,9 +124,9 @@ try {
   }
   for (const [lat, lng] of [[25.003, 121.5], [25.003, 121.503]]) {
     await page.click('#btn-add-via');
-    await page.click('#place-via-list .place-input-row:last-child .place-map-pick');
     await page.evaluate(([lat, lng]) =>
       window._editorMap.fire('click', { latlng: { lat, lng } }), [lat, lng]);
+    await page.waitForFunction(() => !document.getElementById('btn-add-via').disabled);
   }
   await page.locator('#closed-loop-toggle').locator('..').click();
   const markerClasses = await page.evaluate(() => window.__markerOptions

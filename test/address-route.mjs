@@ -30,6 +30,7 @@ await page.addInitScript(() => {
         fitBounds() {},
         getZoom() { return 13; },
         panTo() {},
+        flyTo() { return map; },
       };
       return map;
     },
@@ -40,12 +41,15 @@ await page.addInitScript(() => {
       };
     },
     polyline: layer,
-    marker(_, options) {
+    marker(point, options) {
       const state = { options, active: false };
       markerStates.push(state);
       const marker = layer();
+      const handlers = {};
       marker.addTo = () => { state.active = true; return marker; };
       marker.remove = () => { state.active = false; };
+      marker.on = (name, handler) => { handlers[name] = handler; return marker; };
+      marker.getLatLng = () => ({ lat: point[0], lng: point[1] });
       return marker;
     },
     circleMarker: layer,
@@ -64,6 +68,13 @@ await page.route('https://nominatim.openstreetmap.org/search**', async route => 
     body: JSON.stringify(place ? [{ lat: place[0], lon: place[1], display_name: place[2] }] : []),
   });
 });
+await page.route('https://nominatim.openstreetmap.org/reverse**', route => route.fulfill({
+  contentType: 'application/json',
+  body: JSON.stringify({
+    lat: '25.0375', lon: '121.5637', name: '信義路五段',
+    display_name: '信義路五段, 信義區, 臺北市',
+  }),
+}));
 await page.route('https://router.project-osrm.org/**', route => route.fulfill({
   contentType: 'application/json',
   body: JSON.stringify({
@@ -82,6 +93,28 @@ await page.click('#btn-new-route');
 await page.waitForSelector('#new-route-options:not([hidden])');
 await page.click('[data-new-route-mode="plan"]');
 await page.waitForFunction(() => document.getElementById('view-editor').classList.contains('active'));
+
+await page.click('.editor-panel .sheet-handle');
+const editorDensity = await page.evaluate(() => {
+  const panel = getComputedStyle(document.querySelector('.editor-panel'));
+  const button = getComputedStyle(document.querySelector('#editor-toolbar .btn.tool'));
+  const address = getComputedStyle(document.getElementById('place-start'));
+  const head = getComputedStyle(document.querySelector('.editor-panel .panel-head'));
+  return {
+    panelPaddingTop: parseFloat(panel.paddingTop),
+    toolHeight: parseFloat(button.minHeight),
+    addressHeight: parseFloat(address.minHeight),
+    headMarginBottom: parseFloat(head.marginBottom),
+    svgControls: document.querySelectorAll('.editor-panel .btn .ui-icon').length,
+  };
+});
+if (editorDensity.panelPaddingTop > 10 ||
+    editorDensity.toolHeight > 30 ||
+    editorDensity.addressHeight < 42 ||
+    editorDensity.headMarginBottom > 6 ||
+    editorDensity.svgControls < 12) {
+  throw new Error(`editor layout is too loose: ${JSON.stringify(editorDensity)}`);
+}
 
 if (await page.locator('[data-place-role]').count() !== 3) {
   throw new Error('expected start, end, and via role buttons');
@@ -130,6 +163,12 @@ await page.locator('#place-start + .place-suggestions .place-suggestion').click(
 if (await page.locator('#btn-add-via').isDisabled()) {
   throw new Error('point buttons did not unlock after selecting the start');
 }
+if (!await page.evaluate(() => window.__markerStates.some(state =>
+  state.active &&
+  state.options?.draggable === true &&
+  state.options?.icon?.className?.includes('route-start-marker')))) {
+  throw new Error('start-only marker should remain editable by dragging');
+}
 
 await page.click('#btn-place-end');
 await page.fill('#place-end', '終點');
@@ -139,10 +178,11 @@ await page.click('#btn-add-via');
 if (!await page.locator('#btn-add-via').isDisabled()) {
   throw new Error('via button should lock while its point is pending');
 }
-await page.click('#place-via-list .place-map-pick');
 await page.evaluate(() => window._editorMap.fire('click', {
   latlng: { lat: 25.0375, lng: 121.5637 },
 }));
+await page.waitForFunction(() => document.querySelector('#place-via-list .place-input').value
+  .includes('信義路五段'));
 if (await page.locator('#btn-add-via').isDisabled()) {
   throw new Error('via button did not unlock after the map point was selected');
 }
@@ -156,7 +196,7 @@ await page.waitForFunction(() =>
   null, { timeout: 20000 });
 
 const status = await page.locator('#place-route-status').textContent();
-if (!status.includes('可以加入下一個點')) throw new Error(`unexpected status: ${status}`);
+if (!status.includes('信義路五段')) throw new Error(`unexpected status: ${status}`);
 if (errors.length) throw new Error(`page errors: ${errors.join('\n')}`);
 console.log('address route smoke passed:', status);
 await browser.close();

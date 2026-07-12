@@ -6,7 +6,7 @@ import { initRouteDrag } from './routeDrag.js';
 import { renderTrackDiagram } from './trackDiagram.js';
 import { saveRoute, getRoute, newId } from './store.js';
 import { addBaseMap } from './baseMap.js';
-import { searchPlace, searchPlaces } from './geocode.js';
+import { reversePlace, searchPlace, searchPlaces } from './geocode.js';
 import { acceptedRecordingPoint } from './gpsRouteRecorder.js';
 
 const OSRM = 'https://router.project-osrm.org/route/v1/driving/';
@@ -21,13 +21,13 @@ let placeSuggestionId = 0;
 const selectedPlaces = new WeakMap();
 let recordingWatchId = null, recordingMarker = null;
 let recordingMode = false, lastRecordingPoint = null;
-let pendingPlaceInput = null, pendingMapInput = null;
+let pendingPlaceInput = null;
 
 const MIN_RECORDED_CHECKPOINT_M = 50;
 const MAX_LIGHT_ROUTE_DISTANCE_M = 30;
 
 const TOOL_HELP = {
-  trace: 'Click once for the start and once for the finish. Use + 必經點 before adding each via point.',
+  trace: 'Choose 起點, 終點, or 必經點, then search for an address or tap the map.',
   light: 'Click on the map to mark a traffic light. Click a light for Street View / delete.',
   sector: 'Drag the yellow handles along the route to move sector boundaries. Use +/− Sector to add or remove.',
 };
@@ -61,9 +61,6 @@ export function initEditor(callbacks) {
   document.querySelectorAll('[data-place-role]').forEach(button => {
     button.addEventListener('click', () => beginPlaceSelection(button.dataset.placeRole));
   });
-  document.querySelectorAll('[data-map-input]').forEach(button => {
-    button.addEventListener('click', () => beginMapPlacement(document.getElementById(button.dataset.mapInput)));
-  });
   document.getElementById('place-route-form').addEventListener('submit', event => {
     event.preventDefault();
     buildRouteFromPlaces();
@@ -92,7 +89,6 @@ export function openRoute(existing, { creationMode = 'plan' } = {}) {
   stopGpsRecording({ quiet: true });
   placeSearchSeq += 1;
   pendingPlaceInput = null;
-  pendingMapInput = null;
   recordingMode = creationMode === 'record' || existing?.recorded === true;
   route = existing ?? {
     id: newId(),
@@ -153,19 +149,13 @@ function addViaInput(value = '') {
   inputWrap.className = 'place-input-wrap';
   inputWrap.append(input);
   setupPlaceAutocomplete(input, inputWrap);
-  const mapPick = document.createElement('button');
-  mapPick.type = 'button';
-  mapPick.className = 'btn place-map-pick';
-  mapPick.textContent = '點地圖';
-  mapPick.addEventListener('click', () => beginMapPlacement(input));
   const remove = document.createElement('button');
   remove.type = 'button';
   remove.className = 'btn place-remove';
-  remove.textContent = '移除';
+  remove.innerHTML = '<svg class="ui-icon" aria-hidden="true"><use href="#icon-trash"></use></svg><span>移除</span>';
   remove.addEventListener('click', () => {
     if (pendingPlaceInput === input) {
       pendingPlaceInput = null;
-      pendingMapInput = null;
     }
     row.remove();
     if (!rebuildRouteFromSelectedPlaces()) redrawPlacePins();
@@ -174,7 +164,7 @@ function addViaInput(value = '') {
 
   const actions = document.createElement('div');
   actions.className = 'place-row-actions';
-  actions.append(mapPick, remove);
+  actions.append(remove);
   row.append(label, inputWrap, actions);
   document.getElementById('place-via-list').append(row);
   input.focus();
@@ -187,18 +177,9 @@ function beginPlaceSelection(role) {
     : document.getElementById(`place-${role}`);
   input.closest('.place-input-row').hidden = false;
   pendingPlaceInput = input;
-  pendingMapInput = null;
   input.focus();
   updatePlaceControls();
-  setPlaceStatus(`請輸入${role === 'start' ? '起點' : role === 'end' ? '終點' : '必經點'}，或選擇「點地圖」。`);
-}
-
-function beginMapPlacement(input) {
-  pendingPlaceInput = input;
-  pendingMapInput = input;
-  setTool('trace');
-  updatePlaceControls();
-  flashHelp('請在地圖上點一下以完成這個路徑點。');
+  setPlaceStatus(`請輸入${role === 'start' ? '起點' : role === 'end' ? '終點' : '必經點'}地址，或直接點地圖。`);
 }
 
 function resetPlaceInputs() {
@@ -213,7 +194,6 @@ function resetPlaceInputs() {
   end.closest('.place-input-row').hidden = true;
   document.getElementById('place-via-list').replaceChildren();
   pendingPlaceInput = null;
-  pendingMapInput = null;
   setPlaceStatus('');
   document.getElementById('btn-build-place-route').disabled = false;
   updatePlaceControls();
@@ -223,15 +203,15 @@ function updatePlaceControls() {
   const waiting = pendingPlaceInput && !selectedPlaces.has(pendingPlaceInput);
   document.querySelectorAll('[data-place-role]').forEach(button => {
     button.disabled = Boolean(waiting);
+    const isPendingRole = button.dataset.placeRole === 'via'
+      ? Boolean(pendingPlaceInput?.closest('#place-via-list'))
+      : document.getElementById(`place-${button.dataset.placeRole}`) === pendingPlaceInput;
+    button.classList.toggle('active', isPendingRole);
   });
   document.getElementById('btn-place-start').classList.toggle(
     'complete', selectedPlaces.has(document.getElementById('place-start')));
   document.getElementById('btn-place-end').classList.toggle(
     'complete', selectedPlaces.has(document.getElementById('place-end')));
-  document.querySelectorAll('.place-map-pick').forEach(button => {
-    const rowInput = button.closest('.place-input-row')?.querySelector('.place-input');
-    button.classList.toggle('active', rowInput === pendingMapInput);
-  });
 }
 
 function setPlaceStatus(message) {
@@ -282,12 +262,18 @@ function redrawPlacePins(focusPlace = null) {
       : role === 'end' ? route.waypoints.length > 1 : false;
     if (!place || hasRouteMarker) return;
     const marker = L.marker(place.point, {
+      draggable: true,
       title: `${label}: ${placeLabel(place)}`,
       alt: `${label}: ${placeLabel(place)}`,
       icon: waypointIcon(role),
       riseOnHover: true,
       zIndexOffset: 1000,
     }).addTo(map);
+    marker.on('dragend', () => {
+      const point = [marker.getLatLng().lat, marker.getLatLng().lng];
+      selectedPlaces.set(input, { ...place, point });
+      redrawPlacePins();
+    });
     marker.bindTooltip?.(label, { direction: 'top', offset: [0, -32] });
     placeMarkers.push(marker);
   });
@@ -336,7 +322,6 @@ function setupPlaceAutocomplete(input, inputWrap = input.parentElement) {
         input.value = placeLabel(place);
         selectedPlaces.set(input, place);
         pendingPlaceInput = null;
-        pendingMapInput = null;
         hide();
         applySelectedPlace(input, place);
         updatePlaceControls();
@@ -351,7 +336,6 @@ function setupPlaceAutocomplete(input, inputWrap = input.parentElement) {
   input.addEventListener('input', () => {
     selectedPlaces.delete(input);
     pendingPlaceInput = input;
-    pendingMapInput = null;
     redrawPlacePins();
     updatePlaceControls();
     clearTimeout(timer);
@@ -437,7 +421,6 @@ async function buildRouteFromPlaces() {
 
     route.waypoints = resolved.map(place => place.point);
     pendingPlaceInput = null;
-    pendingMapInput = null;
     clearPlacePins();
     await rebuildGeometry();
     if (route.points.length > 1) {
@@ -585,23 +568,31 @@ function updateToolActions(tool) {
   document.getElementById('sector-summary').hidden = tool !== 'sector';
 }
 
-function onMapClick(e) {
+async function onMapClick(e) {
   if (recordingWatchId !== null) return;
   const p = [e.latlng.lat, e.latlng.lng];
   if (activeTool === 'trace') {
-    if (pendingMapInput) {
-      const input = pendingMapInput;
-      const place = { point: p, name: '地圖選點', detail: '' };
-      input.value = place.name;
-      selectedPlaces.set(input, place);
-      pendingPlaceInput = null;
-      pendingMapInput = null;
-      applySelectedPlace(input, place);
-      updatePlaceControls();
-      setPlaceStatus('地圖位置已選定，可以加入下一個點。');
+    if (pendingPlaceInput) {
+      const input = pendingPlaceInput;
+      const seq = ++placeSearchSeq;
+      setPlaceStatus('正在查詢所選位置的地址…');
+      try {
+        const place = await reversePlace(p);
+        if (seq !== placeSearchSeq || input !== pendingPlaceInput) return;
+        input.value = placeLabel(place);
+        selectedPlaces.set(input, place);
+        pendingPlaceInput = null;
+        applySelectedPlace(input, place);
+        updatePlaceControls();
+        setPlaceStatus(`已選定：${placeLabel(place)}`);
+      } catch (error) {
+        if (seq === placeSearchSeq) {
+          setPlaceStatus(`無法取得這個位置的地址，請再點一次或輸入地址。${error.message}`);
+        }
+      }
       return;
     }
-    flashHelp('請先選擇「起點」、「終點」或「必經點」，再按「點地圖」。');
+    flashHelp('請先選擇「起點」、「終點」或「必經點」，再直接點地圖。');
   } else if (activeTool === 'light') {
     const projection = projectLightOnRoute(p);
     if (!projection) {
@@ -624,7 +615,6 @@ function clearTrace() {
   if (!confirm('Clear the whole trace (waypoints, lights, sectors)?')) return;
   route.recorded = false;
   pendingPlaceInput = null;
-  pendingMapInput = null;
   route.waypoints = [];
   route.lights = [];
   route.sectorBoundaries = [];
