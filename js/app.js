@@ -1,5 +1,5 @@
 // Bootstrap + view routing + routes list + history view.
-import { listRoutes, getRoute, deleteRoute, listRuns, deleteRun,
+import { listRoutes, getRoute, saveRoute, deleteRoute, listRuns, deleteRun,
          allTimeBests } from './store.js';
 import { initEditor, openRoute, editorInvalidate } from './routeBuilder.js';
 import { initRun, openRun, runInvalidate } from './run.js';
@@ -24,6 +24,7 @@ function showView(name) {
     tab.classList.toggle('active', tab.dataset.view === name));
   document.body.classList.toggle('home-active', name === 'home');
   $('btn-back').hidden = name === 'home';
+  $('editor-toolbar').hidden = name !== 'editor';
   homeMapController?.setActive(name === 'home');
   collapseBottomSheets();
   if (name === 'editor') { ensureEditorLoaded(); editorInvalidate(); }
@@ -105,7 +106,8 @@ function renderRouteList() {
     const best = allTimeBests(r.id, r.sectorBoundaries.length + 1, r.timingVersion);
     return `<li>
       <div>
-        <div>${esc(r.name)}</div>
+        <input class="route-name-input" value="${esc(r.name)}" maxlength="40"
+          aria-label="Route name" data-route-name="${r.id}">
         <div class="meta">${km} km · ${r.sectorBoundaries.length + 1} ${t('sectorCount')} · ${r.lights.length} ${t('lightCount')}
           · PB ${fmtTime(best.total)}</div>
       </div>
@@ -119,6 +121,20 @@ function renderRouteList() {
 
   $('route-list').querySelectorAll('[data-run]').forEach(b =>
     b.addEventListener('click', () => startRun(b.dataset.run)));
+  $('route-list').querySelectorAll('[data-route-name]').forEach(input => {
+    const commit = () => {
+      const route = getRoute(input.dataset.routeName);
+      if (!route) return;
+      input.value = input.value.trim() || 'Unnamed route';
+      if (input.value === route.name) return;
+      route.name = input.value;
+      saveRoute(route);
+    };
+    input.addEventListener('change', commit);
+    input.addEventListener('keydown', event => {
+      if (event.key === 'Enter') input.blur();
+    });
+  });
   $('route-list').querySelectorAll('[data-edit]').forEach(b =>
     b.addEventListener('click', () => editRoute(b.dataset.edit)));
   $('route-list').querySelectorAll('[data-del]').forEach(b =>

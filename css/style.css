@@ -116,6 +116,11 @@ body {
   letter-spacing: -0.2px;
 }
 
+.topbar-center {
+  display: grid;
+  justify-items: center;
+}
+
 .svg-sprite {
   position: absolute;
   width: 0;
@@ -597,6 +602,26 @@ body.home-active #topbar {
   line-height: 1.25;
 }
 
+.route-name-input {
+  width: 100%;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  outline: none;
+}
+
+.route-name-input:hover,
+.route-name-input:focus {
+  border-color: var(--border);
+  background: var(--surface);
+}
+
 .route-list .meta,
 .run-list .meta {
   color: var(--dim);
@@ -635,11 +660,11 @@ body.home-active #topbar {
 }
 
 .editor-panel .panel-head {
+  justify-content: flex-end;
   gap: 6px;
-  margin-bottom: 6px;
+  margin-bottom: 3px;
 }
 
-.editor-panel .name-input,
 .editor-panel .stats {
   min-height: 30px;
   padding: 4px 7px;
@@ -700,22 +725,23 @@ body.home-active #topbar {
 }
 
 #editor-toolbar {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 4px;
-  padding: 4px;
+  display: inline-grid;
+  grid-template-columns: repeat(3, 34px);
+  gap: 2px;
+  width: max-content;
+  padding: 2px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface2);
 }
 
 #editor-toolbar .btn.tool {
-  min-height: 30px;
+  width: 34px;
+  min-height: 34px;
   border: 0;
   background: transparent;
   color: var(--dim);
-  padding: 3px 7px;
-  white-space: nowrap;
+  padding: 4px;
 }
 
 #editor-toolbar .btn.tool.active {
@@ -726,23 +752,23 @@ body.home-active #topbar {
 }
 
 .editor-options {
-  grid-column: 1 / -1;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   border-top: 1px solid var(--hairline);
-  margin-top: 2px;
-  padding: 4px 3px 1px;
+  border-bottom: 1px solid var(--hairline);
+  margin: 2px 0 4px;
+  padding: 4px 3px;
 }
 
-#editor-toolbar .toggle {
+.editor-options .toggle {
   min-height: 24px;
   gap: 4px;
   white-space: nowrap;
 }
 
-#editor-toolbar .toggle .ui-icon {
+.editor-options .toggle .ui-icon {
   width: 14px;
   height: 14px;
   flex-basis: 14px;
@@ -1138,6 +1164,25 @@ body.home-active #topbar {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface2);
+}
+
+#editor-toolbar[hidden] {
+  display: none;
+}
+
+#topbar #editor-toolbar {
+  margin: 5px 0 0;
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+#topbar #editor-toolbar .btn.tool {
+  color: rgba(255, 255, 255, 0.68);
+}
+
+#topbar #editor-toolbar .btn.tool.active {
+  background: #fff;
+  color: var(--bg);
 }
 
 .gps-recording-copy {
@@ -1620,11 +1665,7 @@ body.home-active #topbar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  #editor-toolbar .btn.tool {
-    font-size: 11px;
-  }
-
-  #editor-toolbar .toggle {
+  .editor-options .toggle {
     font-size: 10px;
   }
 

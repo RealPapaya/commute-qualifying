@@ -23,6 +23,7 @@ await page.addInitScript(() => {
   const fakeMap = {
     on: () => fakeMap,
     setView: () => fakeMap,
+    flyTo: () => fakeMap,
     panTo: () => fakeMap,
     fitBounds: () => fakeMap,
     invalidateSize: () => fakeMap,
@@ -89,8 +90,9 @@ await page.click('#btn-record-checkpoint');
 await page.click('#btn-record-light');
 await page.evaluate(() => window.__emitRecordedFix(25.0012, 121.5000));
 await page.click('#btn-stop-gps-recording');
-await page.fill('#route-name', 'GPS smoke route');
 await page.click('#btn-save-route');
+await page.fill('#route-list [data-route-name]', 'GPS smoke route');
+await page.locator('#route-list [data-route-name]').press('Enter');
 
 const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('commute-qualifying-v1')).routes[0]);
 if (!saved.recorded || saved.snap !== false || saved.points.length !== 3 || saved.waypoints.length !== 3) {

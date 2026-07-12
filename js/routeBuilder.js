@@ -103,7 +103,6 @@ export function openRoute(existing, { creationMode = 'plan' } = {}) {
   };
   if (recordingMode && !existing) route.snap = false;
   lastRecordingPoint = route.recorded ? route.points.at(-1) ?? null : null;
-  document.getElementById('route-name').value = route.name;
   resetPlaceInputs();
   const snapToggle = document.getElementById('snap-toggle');
   snapToggle.checked = route.snap !== false;
@@ -864,7 +863,7 @@ function persist() {
     setRecordingStatus('Stop GPS recording before saving the route.');
     return;
   }
-  route.name = document.getElementById('route-name').value.trim() || 'Unnamed route';
+  route.name ||= 'Unnamed route';
   route.lights = visibleLights().map(light => light.point);
   route.closedLoop = hasMatchingEndpoints() &&
     document.getElementById('closed-loop-toggle').checked;

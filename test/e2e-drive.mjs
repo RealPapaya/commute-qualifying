@@ -41,7 +41,6 @@ await page.reload();
 await page.click('[data-view="routes"]');
 await page.click('#btn-new-route');
 await page.click('[data-new-route-mode="plan"]');
-await page.fill('#route-name', '立德路115號 → 莊泰路1132號');
 await page.evaluate(([a, b]) => {
   window._editorMap.fitBounds(L.latLngBounds([a, b]).pad(0.15));
 }, [START, END]);
@@ -164,6 +163,8 @@ await shot('4-sectors-custom');
 
 // ---- 5. save, run view ----
 await page.click('#btn-save-route');
+await page.fill('#route-list [data-route-name]', '立德路115號 → 莊泰路1132號');
+await page.locator('#route-list [data-route-name]').press('Enter');
 await shot('5-route-saved');
 await page.click('#route-list [data-run]');
 await page.waitForTimeout(2500);

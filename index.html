@@ -36,7 +36,14 @@
   </svg>
   <header id="topbar">
     <button id="btn-back" class="topbar-back" type="button" aria-label="返回" title="返回" hidden>←</button>
-    <h1><span class="eyebrow">COMMUTE</span><span class="title">QUALIFYING</span></h1>
+    <div class="topbar-center">
+      <h1><span class="eyebrow">COMMUTE</span><span class="title">QUALIFYING</span></h1>
+      <div class="toolbar" id="editor-toolbar" hidden>
+        <button data-tool="trace" class="btn tool active" title="Click map to add waypoints" aria-label="路線" data-i18n-title="traceTitle" data-i18n-aria-label="traceLabel"><svg class="ui-icon"><use href="#icon-route"></use></svg></button>
+        <button data-tool="light" class="btn tool" title="Click route to mark a traffic light" aria-label="號誌" data-i18n-title="lightsTitle" data-i18n-aria-label="lightsLabel"><svg class="ui-icon"><use href="#icon-light"></use></svg></button>
+        <button data-tool="sector" class="btn tool" title="Drag sector boundaries along the route" aria-label="分段" data-i18n-title="sectorsTitle" data-i18n-aria-label="sectorsLabel"><svg class="ui-icon"><use href="#icon-sector"></use></svg></button>
+      </div>
+    </div>
     <details class="settings-menu">
       <summary class="settings-button" aria-label="設定 / Settings" title="設定 / Settings">
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -125,18 +132,10 @@
     <div id="editor-map" class="map"></div>
     <div class="panel editor-panel" data-bottom-sheet data-sheet-state="collapsed">
       <button class="sheet-handle" type="button" aria-label="展開控制面板" aria-expanded="false"></button>
-      <div class="panel-head">
-        <input id="route-name" class="name-input" placeholder="Route name" maxlength="40" data-i18n-placeholder="routeName">
-        <span id="route-stats" class="stats"></span>
-      </div>
-      <div class="toolbar" id="editor-toolbar">
-        <button data-tool="trace" class="btn tool active" title="Click map to add waypoints" data-i18n-title="traceTitle"><svg class="ui-icon"><use href="#icon-route"></use></svg><span data-i18n="traceLabel">路線</span></button>
-        <button data-tool="light" class="btn tool" title="Click route to mark a traffic light" data-i18n-title="lightsTitle"><svg class="ui-icon"><use href="#icon-light"></use></svg><span data-i18n="lightsLabel">號誌</span></button>
-        <button data-tool="sector" class="btn tool" title="Drag sector boundaries along the route" data-i18n-title="sectorsTitle"><svg class="ui-icon"><use href="#icon-sector"></use></svg><span data-i18n="sectorsLabel">分段</span></button>
-        <div class="editor-options">
-          <label class="toggle"><svg class="ui-icon"><use href="#icon-road"></use></svg><input type="checkbox" id="snap-toggle" checked><span data-i18n="snapToRoads">Snap to roads</span></label>
-          <label class="toggle"><svg class="ui-icon"><use href="#icon-loop"></use></svg><input type="checkbox" id="closed-loop-toggle"><span data-i18n="closedLoop">閉環賽道（可連續多圈）</span></label>
-        </div>
+      <div class="panel-head"><span id="route-stats" class="stats"></span></div>
+      <div class="editor-options">
+        <label class="toggle"><svg class="ui-icon"><use href="#icon-road"></use></svg><input type="checkbox" id="snap-toggle" checked><span data-i18n="snapToRoads">Snap to roads</span></label>
+        <label class="toggle"><svg class="ui-icon"><use href="#icon-loop"></use></svg><input type="checkbox" id="closed-loop-toggle"><span data-i18n="closedLoop">閉環賽道（可連續多圈）</span></label>
       </div>
       <div id="tool-help" class="hint"></div>
       <section id="gps-recording-panel" class="gps-recording-panel" hidden aria-label="GPS route recording" data-i18n-aria-label="gpsRecording">

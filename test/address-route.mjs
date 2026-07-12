@@ -105,14 +105,18 @@ const editorDensity = await page.evaluate(() => {
     toolHeight: parseFloat(button.minHeight),
     addressHeight: parseFloat(address.minHeight),
     headMarginBottom: parseFloat(head.marginBottom),
-    svgControls: document.querySelectorAll('.editor-panel .btn .ui-icon').length,
+    svgControls: document.querySelectorAll('.btn .ui-icon').length,
+    toolbarInHeader: document.querySelector('#topbar > .topbar-center > #editor-toolbar') !== null,
+    toolbarInPanel: document.querySelector('.editor-panel #editor-toolbar') !== null,
   };
 });
 if (editorDensity.panelPaddingTop > 10 ||
-    editorDensity.toolHeight > 30 ||
+    editorDensity.toolHeight !== 34 ||
     editorDensity.addressHeight < 42 ||
     editorDensity.headMarginBottom > 6 ||
-    editorDensity.svgControls < 12) {
+    editorDensity.svgControls < 12 ||
+    !editorDensity.toolbarInHeader ||
+    editorDensity.toolbarInPanel) {
   throw new Error(`editor layout is too loose: ${JSON.stringify(editorDensity)}`);
 }
 
@@ -197,6 +201,15 @@ await page.waitForFunction(() =>
 
 const status = await page.locator('#place-route-status').textContent();
 if (!status.includes('信義路五段')) throw new Error(`unexpected status: ${status}`);
+await page.click('#btn-save-route');
+if (await page.locator('#route-name').count()) {
+  throw new Error('route name should not be editable in the route editor');
+}
+await page.fill('#route-list [data-route-name]', '通勤測試路線');
+await page.locator('#route-list [data-route-name]').press('Enter');
+const savedName = await page.evaluate(() =>
+  JSON.parse(localStorage.getItem('commute-qualifying-v1')).routes[0].name);
+if (savedName !== '通勤測試路線') throw new Error(`route rename was not saved: ${savedName}`);
 if (errors.length) throw new Error(`page errors: ${errors.join('\n')}`);
 console.log('address route smoke passed:', status);
 await browser.close();
