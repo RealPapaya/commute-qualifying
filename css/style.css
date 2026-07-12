@@ -789,11 +789,8 @@ body.home-active #topbar {
 }
 
 .editor-route-actions {
+  align-items: stretch;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-#btn-save-route {
-  order: initial;
 }
 
 .editor-stats {

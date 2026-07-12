@@ -100,6 +100,7 @@ const editorDensity = await page.evaluate(() => {
   const button = getComputedStyle(document.querySelector('#editor-toolbar .btn.tool'));
   const address = getComputedStyle(document.getElementById('place-start'));
   const head = getComputedStyle(document.querySelector('.editor-panel .panel-head'));
+  const routeActions = [...document.querySelector('.editor-route-actions').children];
   return {
     panelPaddingTop: parseFloat(panel.paddingTop),
     toolHeight: parseFloat(button.minHeight),
@@ -108,6 +109,12 @@ const editorDensity = await page.evaluate(() => {
     svgControls: document.querySelectorAll('.btn .ui-icon').length,
     toolbarInHeader: document.querySelector('#topbar > .topbar-center > #editor-toolbar') !== null,
     toolbarInPanel: document.querySelector('.editor-panel #editor-toolbar') !== null,
+    routeActionTops: routeActions.map(action => action.getBoundingClientRect().top),
+    routeActionOrder: routeActions.map(action => action.id),
+    statsAtBottom: document.querySelector('.editor-panel').lastElementChild
+      .classList.contains('editor-stats'),
+    buildButtonExists: Boolean(document.getElementById('btn-build-place-route')),
+    toolHelp: document.getElementById('tool-help').textContent,
   };
 });
 if (editorDensity.panelPaddingTop > 10 ||
@@ -116,7 +123,13 @@ if (editorDensity.panelPaddingTop > 10 ||
     editorDensity.headMarginBottom > 6 ||
     editorDensity.svgControls < 12 ||
     !editorDensity.toolbarInHeader ||
-    editorDensity.toolbarInPanel) {
+    editorDensity.toolbarInPanel ||
+    Math.max(...editorDensity.routeActionTops) - Math.min(...editorDensity.routeActionTops) > 1 ||
+    editorDensity.routeActionOrder.join(',') !==
+      'btn-undo-wp,btn-clear-route,btn-save-route,btn-track-diagram' ||
+    !editorDensity.statsAtBottom ||
+    editorDensity.buildButtonExists ||
+    /choose/i.test(editorDensity.toolHelp)) {
   throw new Error(`editor layout is too loose: ${JSON.stringify(editorDensity)}`);
 }
 

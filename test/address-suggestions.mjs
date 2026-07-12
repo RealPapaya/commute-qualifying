@@ -32,6 +32,7 @@ await page.addInitScript(() => {
         fitBounds() {},
         getZoom() { return 13; },
         panTo() {},
+        flyTo() {},
       };
       return map;
     },
@@ -112,9 +113,8 @@ await page.waitForFunction(() => {
     activeClasses.filter(name => name?.includes('route-end-marker')).length === 1 &&
     activeClasses.filter(name => name === 'wp-marker').length === 1;
 });
-await page.locator('#place-end').press('Enter');
-await page.waitForFunction(() => document.querySelector('#place-route-status').textContent
-  .includes('Taipei Main Station'),
+await page.waitForFunction(() => !document.getElementById('route-stats').textContent
+  .startsWith('0.00 km'),
   null, { timeout: 10000 });
 const activeClasses = await page.evaluate(() => window.__markerStates
   .filter(state => state.active).map(state => state.options?.icon?.className));

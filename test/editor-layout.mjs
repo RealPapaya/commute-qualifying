@@ -4,6 +4,41 @@ const browser = await chromium.launch({ channel: 'msedge', headless: true });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 const errors = [];
 page.on('pageerror', error => errors.push(String(error)));
+await page.addInitScript(() => {
+  const layer = () => ({
+    addTo() { return this; },
+    remove() {},
+    on() { return this; },
+    bindPopup() { return this; },
+  });
+  window.L = {
+    map() {
+      const map = {
+        setView() { return map; },
+        on() { return map; },
+        invalidateSize() {},
+        fitBounds() {},
+        getZoom() { return 13; },
+        panTo() {},
+        flyTo() {},
+      };
+      return map;
+    },
+    maplibreGL() {
+      return {
+        ...layer(),
+        getMaplibreMap() { return { on() {} }; },
+      };
+    },
+    polyline: layer,
+    marker: layer,
+    circleMarker: layer,
+    layerGroup: layer,
+    divIcon(options) { return options; },
+    latLngBounds(points) { return points; },
+  };
+});
+await page.route('https://unpkg.com/**', route => route.fulfill({ body: '' }));
 
 await page.goto('http://localhost:8080/');
 await page.evaluate(() => {
