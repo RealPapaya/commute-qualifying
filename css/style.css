@@ -751,6 +751,12 @@ body.home-active #topbar {
   box-shadow: none;
 }
 
+#btn-track-diagram[aria-pressed="true"] {
+  background: var(--bar);
+  border-color: var(--bar);
+  color: #fff;
+}
+
 .editor-options {
   display: flex;
   align-items: center;
@@ -1207,9 +1213,14 @@ body.home-active #topbar {
 .place-endpoint-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 40px;
-  grid-template-rows: repeat(2, auto);
-  align-items: center;
+  align-items: stretch;
   gap: 5px;
+}
+
+.place-points-list {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
 }
 
 .place-input-row {
@@ -1219,17 +1230,8 @@ body.home-active #topbar {
   gap: 5px;
 }
 
-.place-endpoint-grid .place-input-row {
-  grid-column: 1;
+.place-points-list > .place-input-row {
   grid-template-columns: 42px minmax(0, 1fr);
-}
-
-.place-endpoint-grid [data-place-row="start"] {
-  grid-row: 1;
-}
-
-.place-endpoint-grid [data-place-row="end"] {
-  grid-row: 2;
 }
 
 .place-input-row label {
@@ -1253,10 +1255,11 @@ body.home-active #topbar {
 
 .place-add-via {
   grid-column: 2;
-  grid-row: 1 / 3;
-  align-self: stretch;
+  grid-row: 1;
+  align-self: start;
   width: 40px;
-  min-height: 0;
+  height: 42px;
+  min-height: 42px;
   padding: 0;
   font-size: 20px;
   line-height: 1;
@@ -1329,6 +1332,32 @@ body.home-active #topbar {
 .place-via-list {
   display: grid;
   gap: 5px;
+}
+
+.place-via-list:empty {
+  display: none;
+}
+
+.place-via-list .place-input-row {
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.place-via-list .place-input-row.dragging {
+  opacity: 0.58;
+}
+
+.place-via-drag {
+  width: 30px;
+  min-height: 30px;
+  padding: 3px;
+  cursor: grab;
+  touch-action: none;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.place-via-drag:active {
+  cursor: grabbing;
 }
 
 .place-remove {
@@ -1532,6 +1561,11 @@ body.home-active #topbar {
 
 .track-diagram-overlay:not([hidden]) {
   display: flex;
+}
+
+/* Editor diagram changes only the map presentation; keep its bottom sheet on top. */
+#track-diagram-overlay {
+  z-index: 2000;
 }
 
 .track-diagram-head {

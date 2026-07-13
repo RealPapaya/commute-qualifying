@@ -4,11 +4,13 @@ import { cumulativeDistances, projectOnRoute } from './geo.js';
 import { initSectorTool, renderSectorHandles, defaultBoundaries } from './sectors.js';
 import { initRouteDrag } from './routeDrag.js';
 import { renderTrackDiagram } from './trackDiagram.js';
+import { resetTrackDiagramView } from './trackDiagramInteraction.js';
 import { saveRoute, getRoute, newId } from './store.js';
 import { addBaseMap } from './baseMap.js';
 import { reversePlace, searchPlace, searchPlaces } from './geocode.js';
 import { acceptedRecordingPoint } from './gpsRouteRecorder.js';
 import { waypointBearings } from './routeRouting.js';
+import { initSortableList } from './sortableList.js';
 
 const OSRM = 'https://router.project-osrm.org/route/v1/driving/';
 
@@ -51,14 +53,18 @@ export function initEditor(callbacks) {
   document.getElementById('btn-editor-advanced').addEventListener('click', toggleAdvanced);
   document.getElementById('btn-add-sector').addEventListener('click', () => changeSectorCount(+1));
   document.getElementById('btn-remove-sector').addEventListener('click', () => changeSectorCount(-1));
-  document.getElementById('btn-track-diagram').addEventListener('click', showTrackDiagram);
-  document.getElementById('btn-diagram-back').addEventListener('click', hideTrackDiagram);
+  document.getElementById('btn-track-diagram').addEventListener('click', toggleTrackDiagram);
   document.getElementById('btn-start-gps-recording').addEventListener('click', startGpsRecording);
   document.getElementById('btn-stop-gps-recording').addEventListener('click', stopGpsRecording);
   document.getElementById('btn-record-checkpoint').addEventListener('click', addRecordedCheckpoint);
   document.getElementById('btn-record-light').addEventListener('click', addRecordedLight);
   setupPlaceAutocomplete(document.getElementById('place-start'));
   setupPlaceAutocomplete(document.getElementById('place-end'));
+  initSortableList(document.getElementById('place-via-list'), {
+    itemSelector: '.place-input-row',
+    handleSelector: '.place-via-drag',
+    onChange: applyViaOrder,
+  });
   document.getElementById('btn-add-via').addEventListener('click', beginViaSelection);
   document.getElementById('place-route-form').addEventListener('submit', event => {
     event.preventDefault();
@@ -130,6 +136,22 @@ function viaInputs() {
   return [...document.querySelectorAll('#place-via-list .place-input')];
 }
 
+function refreshViaLabels() {
+  document.querySelectorAll('#place-via-list .place-input-row').forEach((row, index) => {
+    const number = index + 1;
+    row.querySelector('label').textContent = `必經 ${number}`;
+    row.querySelector('.place-input').setAttribute('aria-label', `必經地點 ${number}`);
+    row.querySelector('.place-via-drag').setAttribute('aria-label', `拖曳調整必經點 ${number} 的順序`);
+  });
+}
+
+function applyViaOrder() {
+  refreshViaLabels();
+  if (!rebuildRouteFromSelectedPlaces()) redrawPlacePins();
+  updatePlaceControls();
+  setPlaceStatus('已更新必經點順序。');
+}
+
 function addViaInput(value = '') {
   const row = document.createElement('div');
   row.className = 'place-input-row';
@@ -156,15 +178,23 @@ function addViaInput(value = '') {
       pendingPlaceInput = null;
     }
     row.remove();
+    refreshViaLabels();
     if (!rebuildRouteFromSelectedPlaces()) redrawPlacePins();
     updatePlaceControls();
   });
 
+  const drag = document.createElement('button');
+  drag.type = 'button';
+  drag.className = 'btn place-via-drag';
+  drag.textContent = '≡';
+  drag.title = '拖曳調整順序';
+
   const actions = document.createElement('div');
   actions.className = 'place-row-actions';
-  actions.append(remove);
+  actions.append(drag, remove);
   row.append(label, inputWrap, actions);
   document.getElementById('place-via-list').append(row);
+  refreshViaLabels();
   input.focus();
   return input;
 }
@@ -862,19 +892,26 @@ function updateClosedLoopControl() {
 
 // Diagram mode renders the current in-memory route as a clean circuit view.
 // Filters re-render the SVG without disturbing the editor state underneath.
+function toggleTrackDiagram() {
+  if (document.getElementById('track-diagram-overlay').hidden) showTrackDiagram();
+  else hideTrackDiagram();
+}
+
 function showTrackDiagram() {
   if (!route || route.points.length < 2) return;
   resetTrackDiagramFilters();
+  resetTrackDiagramView(document.getElementById('track-diagram-svg'));
   // Unhide first: the diagram sizes its viewBox from the container, which has
   // no box while [hidden].
   document.getElementById('track-diagram-overlay').hidden = false;
-  document.getElementById('view-editor').classList.add('diagram-mode');
+  document.getElementById('btn-track-diagram').setAttribute('aria-pressed', 'true');
   refreshTrackDiagram();
 }
 
 function hideTrackDiagram() {
   document.getElementById('track-diagram-overlay').hidden = true;
-  document.getElementById('view-editor').classList.remove('diagram-mode');
+  document.getElementById('btn-track-diagram').setAttribute('aria-pressed', 'false');
+  setTimeout(() => map?.invalidateSize(), 0);
 }
 
 function resetTrackDiagramFilters() {

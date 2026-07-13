@@ -129,7 +129,19 @@
 
   <!-- Route editor -->
   <section id="view-editor" class="view">
-    <div id="editor-map" class="map"></div>
+    <div id="editor-map" class="map">
+      <div id="track-diagram-overlay" class="track-diagram-overlay" hidden>
+        <div class="track-diagram-head">
+          <div class="track-diagram-title" data-i18n="trackDiagramMode">賽道圖模式</div>
+          <div class="track-diagram-filters" aria-label="賽道圖篩選" data-i18n-aria-label="trackDiagramFilters">
+            <label class="toggle"><input type="checkbox" id="diagram-filter-sector-colors" checked><span data-i18n="sectorColors">Sector colors</span></label>
+            <label class="toggle"><input type="checkbox" id="diagram-filter-checkpoints" checked><span data-i18n="sectorCheckpoints">Sector checkpoints</span></label>
+            <label class="toggle"><input type="checkbox" id="diagram-filter-lights"><span data-i18n="trafficLights">Traffic lights</span></label>
+          </div>
+        </div>
+        <div id="track-diagram-svg" class="track-diagram-svg"></div>
+      </div>
+    </div>
     <div class="panel editor-panel" data-bottom-sheet data-sheet-state="collapsed">
       <button class="sheet-handle" type="button" aria-label="展開控制面板" aria-expanded="false"></button>
       <div id="tool-help" class="hint"></div>
@@ -147,17 +159,19 @@
       </section>
       <form id="place-route-form" class="place-route-form">
         <div class="place-endpoint-grid">
-          <div class="place-input-row" data-place-row="start">
-            <label for="place-start" data-i18n="start">起點</label>
-            <input id="place-start" class="place-input" type="search" placeholder="輸入路名、地址或地標" autocomplete="street-address" data-i18n-placeholder="placePlaceholder">
-          </div>
-          <div class="place-input-row" data-place-row="end">
-            <label for="place-end" data-i18n="end">終點</label>
-            <input id="place-end" class="place-input" type="search" placeholder="輸入路名、地址或地標" autocomplete="street-address" data-i18n-placeholder="placePlaceholder">
+          <div class="place-points-list">
+            <div class="place-input-row" data-place-row="start">
+              <label for="place-start" data-i18n="start">起點</label>
+              <input id="place-start" class="place-input" type="search" placeholder="輸入路名、地址或地標" autocomplete="street-address" data-i18n-placeholder="placePlaceholder">
+            </div>
+            <div id="place-via-list" class="place-via-list"></div>
+            <div class="place-input-row" data-place-row="end">
+              <label for="place-end" data-i18n="end">終點</label>
+              <input id="place-end" class="place-input" type="search" placeholder="輸入路名、地址或地標" autocomplete="street-address" data-i18n-placeholder="placePlaceholder">
+            </div>
           </div>
           <button id="btn-add-via" type="button" class="btn place-add-via" title="新增必經點" aria-label="新增必經點">+</button>
         </div>
-        <div id="place-via-list" class="place-via-list"></div>
         <p id="place-route-status" class="hint" role="status" aria-live="polite"></p>
       </form>
       <div id="editor-tool-actions">
@@ -185,21 +199,9 @@
       </div>
       <div class="toolbar editor-route-actions">
         <button id="btn-editor-advanced" class="btn" type="button" aria-expanded="false" aria-controls="editor-advanced"><span data-i18n="advanced">進階</span></button>
-        <button id="btn-track-diagram" class="btn" disabled title="Show F1-style circuit diagram" data-i18n-title="trackDiagramTitle"><svg class="ui-icon"><use href="#icon-diagram"></use></svg><span data-i18n="trackDiagramLabel">賽道圖</span></button>
+        <button id="btn-track-diagram" class="btn" type="button" disabled aria-pressed="false" title="Show F1-style circuit diagram" data-i18n-title="trackDiagramTitle"><svg class="ui-icon"><use href="#icon-diagram"></use></svg><span data-i18n="trackDiagramLabel">賽道圖</span></button>
         <button id="btn-save-route" class="btn primary"><svg class="ui-icon"><use href="#icon-save"></use></svg><span data-i18n="save">Save</span></button>
       </div>
-    </div>
-    <div id="track-diagram-overlay" class="track-diagram-overlay" hidden>
-      <div class="track-diagram-head">
-        <button id="btn-diagram-back" class="btn" data-i18n="backEditor">返回編輯</button>
-        <div class="track-diagram-title" data-i18n="trackDiagramMode">賽道圖模式</div>
-        <div class="track-diagram-filters" aria-label="賽道圖篩選" data-i18n-aria-label="trackDiagramFilters">
-          <label class="toggle"><input type="checkbox" id="diagram-filter-sector-colors" checked><span data-i18n="sectorColors">Sector colors</span></label>
-          <label class="toggle"><input type="checkbox" id="diagram-filter-checkpoints" checked><span data-i18n="sectorCheckpoints">Sector checkpoints</span></label>
-          <label class="toggle"><input type="checkbox" id="diagram-filter-lights"><span data-i18n="trafficLights">Traffic lights</span></label>
-        </div>
-      </div>
-      <div id="track-diagram-svg" class="track-diagram-svg"></div>
     </div>
   </section>
 

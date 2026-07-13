@@ -82,7 +82,7 @@ if (!layout.actionsAreLast) throw new Error('the three editor actions are not th
 if (!layout.advancedHidden) throw new Error('advanced panel should start collapsed');
 const { startBox, endBox, addBox } = layout.endpointLayout;
 if (startBox.top >= endBox.top || Math.abs(addBox.top - startBox.top) > 1 ||
-    Math.abs(addBox.bottom - endBox.bottom) > 1 || addBox.left <= startBox.right) {
+    Math.abs(addBox.height - startBox.height) > 1 || addBox.left <= startBox.right) {
   throw new Error(`unexpected endpoint layout: ${JSON.stringify(layout.endpointLayout)}`);
 }
 await page.click('#btn-editor-advanced');

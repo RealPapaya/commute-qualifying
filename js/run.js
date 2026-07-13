@@ -5,6 +5,7 @@ import { createRun, feedFix, elapsed, classifySector, fmtTime, fmtDelta,
          MAX_ACCURACY_M, OFF_ROUTE_M } from './timing.js';
 import { allTimeBests, saveRun, newId, listRuns } from './store.js';
 import { renderTrackDiagram } from './trackDiagram.js';
+import { resetTrackDiagramView } from './trackDiagramInteraction.js';
 import { initSummary, showSummary } from './summary.js';
 import { addBaseMap } from './baseMap.js';
 
@@ -156,7 +157,10 @@ function setMapMode(mode, { resetFilters = false } = {}) {
   $('run-map').classList.toggle('track-mode', mapMode === 'track');
 
   if (mapMode === 'track') {
-    if (resetFilters) resetTrackDiagramFilters();
+    if (resetFilters) {
+      resetTrackDiagramFilters();
+      resetTrackDiagramView($('run-track-diagram-svg'));
+    }
     refreshTrackDiagram();
   }
 

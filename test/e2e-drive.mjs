@@ -81,10 +81,8 @@ for (let i = 0; i < [WP1, WP2].length; i++) {
 console.log('traced:', await stats());
 await shot('1-route-traced');
 
-// ---- 1a2. Feature B: F1-circuit-style track diagram overlay, then back to
-// editor with state intact. The diagram overlays the map (higher z-index)
-// rather than hiding it via display:none, so "editor map hidden" is checked
-// as "the diagram overlay is visible on top of it".
+// ---- 1a2. Feature B: F1-circuit-style track diagram presentation within the
+// editor map. The editor panel stays visible and the same button toggles back.
 await page.click('#btn-track-diagram');
 await page.waitForSelector('#track-diagram-svg svg path');
 const diagramPathCount = await page.locator('#track-diagram-svg svg path').count();
@@ -93,10 +91,34 @@ if (diagramPathCount === 0) throw new Error('track diagram rendered no path elem
 if (await page.locator('#track-diagram-overlay').isHidden()) {
   throw new Error('track diagram overlay did not become visible');
 }
+if (!await page.locator('.editor-panel').isVisible()) {
+  throw new Error('editor panel disappeared in track diagram mode');
+}
+if (await page.locator('#btn-diagram-back').count()) {
+  throw new Error('track diagram still has a separate back button');
+}
+const diagramSvg = page.locator('#track-diagram-svg svg');
+const diagramBox = await diagramSvg.boundingBox();
+const readViewBox = async () => (await diagramSvg.getAttribute('viewBox')).split(/\s+/).map(Number);
+const viewBoxBeforeZoom = await readViewBox();
+await page.mouse.move(diagramBox.x + diagramBox.width / 2, diagramBox.y + diagramBox.height / 2);
+await page.mouse.wheel(0, -400);
+const viewBoxAfterZoom = await readViewBox();
+await page.mouse.down();
+await page.mouse.move(diagramBox.x + diagramBox.width * 0.65,
+  diagramBox.y + diagramBox.height * 0.6, { steps: 4 });
+await page.mouse.up();
+const viewBoxAfterDrag = await readViewBox();
+if (viewBoxAfterZoom[2] >= viewBoxBeforeZoom[2] ||
+    (viewBoxAfterDrag[0] === viewBoxAfterZoom[0] && viewBoxAfterDrag[1] === viewBoxAfterZoom[1])) {
+  throw new Error(`track diagram zoom/drag failed: ${JSON.stringify({
+    viewBoxBeforeZoom, viewBoxAfterZoom, viewBoxAfterDrag,
+  })}`);
+}
 await shot('1a2-track-diagram');
-await page.click('#btn-diagram-back');
+await page.click('#btn-track-diagram');
 await page.waitForSelector('.wp-marker', { state: 'visible' });
-console.log('editor restored after track diagram back, wp-markers:',
+console.log('editor map restored after track diagram toggle, wp-markers:',
   await page.locator('.wp-marker').count());
 
 // Traffic lights are manual-only; tracing a route must not create any.

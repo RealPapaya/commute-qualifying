@@ -81,7 +81,7 @@ await page.click('#btn-track-diagram');
 await page.waitForSelector('#track-diagram-svg svg');
 await page.waitForTimeout(300);
 await shot('3-track-diagram');
-await page.click('#btn-diagram-back');
+await page.click('#btn-track-diagram');
 
 await page.click('#btn-back');
 await page.click('#route-list [data-run]');

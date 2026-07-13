@@ -3,6 +3,7 @@
 // splitIntoSectors) do no DOM work and are node-testable; renderTrackDiagram
 // builds the actual SVG into a container element.
 import { cumulativeDistances, pointAtDistance, haversine } from './geo.js';
+import { bindTrackDiagramInteraction } from './trackDiagramInteraction.js';
 
 const VIEW_W = 1000, VIEW_H = 700, VIEW_PAD = 60;
 const SECTOR_COLORS = ['#e10600', '#2979ff', '#ffd600']; // F1 S1 red / S2 blue / S3 yellow, cycled
@@ -300,4 +301,5 @@ export function renderTrackDiagram(container, route, options = {}) {
   svg.appendChild(statsText);
 
   container.appendChild(svg);
+  bindTrackDiagramInteraction(container, svg, viewBox, activeViewBox);
 }
