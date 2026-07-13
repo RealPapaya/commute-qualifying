@@ -69,6 +69,21 @@ await page.click('.f1c-close');
 await page.waitForSelector('#summary-overlay', { state: 'hidden', timeout: 4000 });
 console.log('close: ok');
 
+// The collapsed Run sheet must not create page-level overflow after dismissing
+// the summary; otherwise the view is left scrolled part-way into the sheet and
+// its handle appears clipped.
+const sheetBeforeExpand = await page.evaluate(() => ({
+  scrollY,
+  state: document.querySelector('.run-panel').dataset.sheetState,
+}));
+if (sheetBeforeExpand.scrollY !== 0 || sheetBeforeExpand.state !== 'collapsed') {
+  throw new Error(`Run sheet is not reset after summary dismissal: ${JSON.stringify(sheetBeforeExpand)}`);
+}
+await page.click('.run-panel .sheet-handle');
+await page.waitForFunction(() =>
+  document.querySelector('.run-panel').dataset.sheetState === 'expanded');
+console.log('run sheet after summary: expandable');
+
 await page.click('#btn-back');
 await page.click('[data-view="history"]');
 await page.waitForSelector('#summary-overlay .f1c-card', { timeout: 4000 });

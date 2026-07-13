@@ -1719,6 +1719,10 @@ body.home-active #topbar {
   #view-editor.active,
   #view-run.active {
     min-height: 0;
+    /* A collapsed sheet is translated below the view. Keep that visual
+       overflow inside the view so dismissing the summary cannot leave the
+       document scrolled into the sheet's off-screen area. */
+    overflow: hidden;
   }
 
   #view-editor .map,
