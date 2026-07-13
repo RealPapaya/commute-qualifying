@@ -84,9 +84,15 @@ await shot('3-track-diagram');
 await page.click('#btn-track-diagram');
 
 await page.click('#btn-back');
+await page.click('[data-view="routes"]');
 await page.click('#route-list [data-run]');
 await waitForMap('_runMap');
 await shot('4-run-collapsed');
+await page.click('.run-panel .sheet-handle');
+await page.waitForSelector('.run-panel[data-sheet-state="expanded"]');
+await page.click('.run-panel .sheet-handle');
+await page.waitForSelector('.run-panel[data-sheet-state="collapsed"]');
+await page.waitForTimeout(250);
 const runHandle = await page.locator('.run-panel .sheet-handle').boundingBox();
 await page.mouse.move(runHandle.x + runHandle.width / 2, runHandle.y + runHandle.height / 2);
 await page.mouse.down();
@@ -97,7 +103,7 @@ await page.waitForTimeout(250);
 await shot('4-run');
 
 await page.click('#btn-back');
-await page.click('#btn-history');
+await page.click('[data-view="history"]');
 await page.waitForTimeout(400);
 await shot('5-history');
 

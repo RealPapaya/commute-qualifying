@@ -37,7 +37,7 @@ const messages = {
     history: 'Run History & Personal Bests', historyEmpty: 'No completed runs yet.', closeSummary: 'Close summary',
     sectorCount: 'sectors', lightCount: 'lights', run: 'Run', edit: 'Edit', delete: 'Delete',
     deleteRouteConfirm: 'Delete this route and all its runs?', deletedRoute: '(deleted route)',
-    summary: 'Summary', simulated: '(sim)', lap: 'Lap',
+    summary: 'Summary', simulated: '(sim)', lap: 'Lap', records: 'records', allTracks: 'All tracks',
   },
   zh: {
     traceLabel: '路線', lightsLabel: '號誌', sectorsLabel: '分段', viaLabel: '必經點',
@@ -75,7 +75,7 @@ const messages = {
     history: '行駛紀錄與個人最佳成績', historyEmpty: '還沒有完成的行駛紀錄。', closeSummary: '關閉摘要',
     sectorCount: '賽段', lightCount: '紅綠燈', run: '計時', edit: '編輯', delete: '刪除',
     deleteRouteConfirm: '要刪除這條路線與所有行駛紀錄嗎？', deletedRoute: '（已刪除的路線）',
-    summary: '摘要', simulated: '（模擬）', lap: '單圈',
+    summary: '摘要', simulated: '（模擬）', lap: '單圈', records: '筆紀錄', allTracks: '所有賽道',
   },
 };
 

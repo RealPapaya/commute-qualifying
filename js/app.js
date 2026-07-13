@@ -16,8 +16,10 @@ let lastSummaryRunId = null;
 let runLoadedKey = null;    // routeId:timingVersion currently loaded in the run view
 let editorLoadedId = null;  // routeId currently loaded in the editor
 let homeMapController = null;
+let historyRouteId = null;
 
 function showView(name) {
+  if (name === 'history') historyRouteId = null;
   document.querySelectorAll('.view').forEach(v =>
     v.classList.toggle('active', v.id === `view-${name}`));
   document.querySelectorAll('#tabs .tab').forEach(tab =>
@@ -172,31 +174,75 @@ function startRun(id) {
 function renderHistory() {
   const routes = listRoutes();
   const runs = listRuns().slice().reverse();
+  const routesById = new Map(routes.map(route => [route.id, route]));
+  const groups = new Map();
+  runs.forEach(run => {
+    if (!groups.has(run.routeId)) groups.set(run.routeId, []);
+    groups.get(run.routeId).push(run);
+  });
   $('history-empty').hidden = runs.length > 0;
 
-  // Best board: per-route PBs
-  $('best-board').innerHTML = routes.map(r => {
-    const best = allTimeBests(r.id, r.sectorBoundaries.length + 1, r.timingVersion);
-    if (best.total == null) return '';
-    const cells = best.sectors.map((s, i) =>
-      `<div class="best-cell"><div class="v">${fmtTime(s)}</div><div class="k">S${i + 1}</div></div>`
-    ).join('');
-    return `<h3 style="margin:8px 0 6px;font-size:13px">${esc(r.name)}</h3>
-      <div class="best-grid">${cells}
+  if (historyRouteId && !groups.has(historyRouteId)) historyRouteId = null;
+  const heading = document.querySelector('#view-history .panel-head h2');
+
+  if (!historyRouteId) {
+    heading.textContent = t('history');
+    $('best-board').innerHTML = '';
+    $('run-history').innerHTML = [...groups].map(([routeId, routeRuns]) => {
+      const route = routesById.get(routeId);
+      const best = route
+        ? allTimeBests(route.id, route.sectorBoundaries.length + 1, route.timingVersion)
+        : { total: null };
+      return `<li class="history-route">
+        <button class="history-route-button" data-historyroute="${esc(routeId)}">
+          <span>
+            <strong>${esc(route?.name ?? t('deletedRoute'))}</strong>
+            <span class="meta">${routeRuns.length} ${t('records')} · PB ${fmtTime(best.total)}</span>
+          </span>
+          <span class="history-route-arrow" aria-hidden="true">›</span>
+        </button>
+      </li>`;
+    }).join('');
+
+    $('run-history').querySelectorAll('[data-historyroute]').forEach(button =>
+      button.addEventListener('click', () => {
+        historyRouteId = button.dataset.historyroute;
+        renderHistory();
+      }));
+    return;
+  }
+
+  const route = routesById.get(historyRouteId);
+  const routeRuns = groups.get(historyRouteId);
+  heading.textContent = route?.name ?? t('deletedRoute');
+
+  let bestBoard = `<button class="btn history-back" id="history-route-back">← ${t('allTracks')}</button>`;
+  if (route) {
+    const best = allTimeBests(route.id, route.sectorBoundaries.length + 1, route.timingVersion);
+    if (best.total != null) {
+      const cells = best.sectors.map((sector, i) =>
+        `<div class="best-cell"><div class="v">${fmtTime(sector)}</div><div class="k">S${i + 1}</div></div>`
+      ).join('');
+      bestBoard += `<div class="best-grid">${cells}
         <div class="best-cell"><div class="v">${fmtTime(best.total)}</div><div class="k">${t('lap')}</div></div>
       </div>`;
-  }).join('');
+    }
+  }
+  $('best-board').innerHTML = bestBoard;
+  $('history-route-back').addEventListener('click', () => {
+    historyRouteId = null;
+    renderHistory();
+  });
 
-  $('run-history').innerHTML = runs.map(run => {
-    const route = routes.find(r => r.id === run.routeId);
+  $('run-history').innerHTML = routeRuns.map(run => {
     const d = new Date(run.date);
-    const sectors = run.sectorTimes.map((t, i) => `S${i + 1} ${fmtTime(t)}`).join(' · ');
+    const sectors = run.sectorTimes.map((time, i) => `S${i + 1} ${fmtTime(time)}`).join(' · ');
     const summaryButton = route
       ? `<button class="btn primary" data-summaryrun="${run.id}">${t('summary')}</button>`
       : '';
     return `<li>
       <div>
-        <div>${esc(route?.name ?? t('deletedRoute'))} — <strong>${fmtTime(run.totalTime)}</strong>
+        <div><strong>${fmtTime(run.totalTime)}</strong>
           ${run.simulated ? `<span class="meta">${t('simulated')}</span>` : ''}</div>
         <div class="meta">${d.toLocaleString()} · ${sectors}</div>
       </div>
@@ -207,12 +253,12 @@ function renderHistory() {
     </li>`;
   }).join('');
 
-  $('run-history').querySelectorAll('[data-summaryrun]').forEach(b =>
-    b.addEventListener('click', () => showRunSummary(b.dataset.summaryrun)));
+  $('run-history').querySelectorAll('[data-summaryrun]').forEach(button =>
+    button.addEventListener('click', () => showRunSummary(button.dataset.summaryrun)));
 
-  $('run-history').querySelectorAll('[data-delrun]').forEach(b =>
-    b.addEventListener('click', () => {
-      deleteRun(b.dataset.delrun);
+  $('run-history').querySelectorAll('[data-delrun]').forEach(button =>
+    button.addEventListener('click', () => {
+      deleteRun(button.dataset.delrun);
       renderHistory();
     }));
 }

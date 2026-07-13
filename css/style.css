@@ -641,6 +641,46 @@ body.home-active #topbar {
   grid-column: 1 / -1;
 }
 
+.run-list .history-route {
+  padding: 0;
+}
+
+.history-route-button {
+  display: flex;
+  width: 100%;
+  min-height: 72px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  padding: 14px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.history-route-button > span:first-child {
+  display: grid;
+  gap: 6px;
+}
+
+.history-route-button strong {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.history-route-arrow {
+  color: var(--dim);
+  font-size: 28px;
+  line-height: 1;
+}
+
+.history-back {
+  margin-bottom: 10px;
+}
+
 /* --- editor / run bottom sheets --- */
 
 .editor-panel,
