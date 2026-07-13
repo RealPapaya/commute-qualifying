@@ -242,11 +242,10 @@ initRun({
     lastSummaryRunId = record.id;
     /* history re-renders on tab open */
   },
-  onReplanRoute(routeId) {
-    activeRouteId = routeId;
-    editorLoadedId = null;
+  onRouteContinued(route) {
+    activeRouteId = route.id;
+    runLoadedKey = `${route.id}:${route.timingVersion}`;
     enableTabs(true, true);
-    showView('editor');
   },
 });
 initBottomSheets();

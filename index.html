@@ -229,11 +229,15 @@
       <div id="run-status" class="run-status" data-i18n="runStatus">Press ARM, then drive. Timing starts when you cross the start line.</div>
       <div id="offroute-flag" class="offroute-flag" role="alertdialog" aria-live="assertive" aria-labelledby="offroute-title" hidden>
         <div id="offroute-title" class="offroute-title" data-i18n="offRoute">YELLOW FLAG — off route</div>
-        <div class="offroute-copy" data-i18n="offRouteCopy">你已經脫離 trace。可以重新規劃路線，或等待 GPS 回到軌道後繼續。</div>
+        <div class="offroute-copy" data-i18n="offRouteCopy">你已經偏離路線。要不要從目前位置開闢新路線，並讓本次計時繼續？</div>
         <div class="toolbar offroute-actions">
-          <button id="btn-replan-route" class="btn" data-i18n="replan">重新規劃路線</button>
+          <button id="btn-replan-route" class="btn" data-i18n="replan">開新路線並繼續</button>
           <button id="btn-wait-track" class="btn primary" data-i18n="waitTrack">等待回到軌道</button>
         </div>
+      </div>
+      <div id="run-manual-actions" class="toolbar run-manual-actions" hidden>
+        <button id="btn-manual-start" class="btn primary" data-i18n="manualStart" hidden>提前開始</button>
+        <button id="btn-restart-run" class="btn" data-i18n="restartRun" hidden>重新開始</button>
       </div>
       <div id="run-clock" class="run-clock">--:--:---</div>
       <div id="sector-board" class="sector-board"></div>

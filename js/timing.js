@@ -6,6 +6,7 @@ import { projectOnRoute } from './geo.js';
 
 export const OFF_ROUTE_M = 60;        // reject fixes farther than this from route
 export const START_RADIUS_M = 40;     // must be near start line to trigger launch
+export const MANUAL_START_RADIUS_M = 150; // allow an intentional early start nearby
 export const BACKWARDS_TOLERANCE_M = 25; // GPS jitter may step back this much
 export const MAX_ACCURACY_M = 40;     // callers should drop fixes worse than this
 const LOOP_WRAP_RADIUS_M = START_RADIUS_M + BACKWARDS_TOLERANCE_M;
@@ -68,13 +69,7 @@ export function feedFix(run, fix) {
 
   if (run.state === 'armed') {
     // Launch when we are on the route near its start and begin moving forward.
-    if (proj.progress < START_RADIUS_M) {
-      run.state = 'running';
-      run.startTime = fix.t;
-      run.maxProgress = proj.progress;
-      run.lastFix = { t: fix.t, progress: proj.progress };
-      return 'start';
-    }
+    if (startRunAtFix(run, fix, START_RADIUS_M)) return 'start';
     return null;
   }
 
@@ -122,6 +117,47 @@ export function feedFix(run, fix) {
   run.lastFix = { t: fix.t, progress };
   if (event === 'finish') run.state = 'finished';
   return event;
+}
+
+export function canStartRunAtFix(run, fix, radiusM = MANUAL_START_RADIUS_M) {
+  if (!run || run.state !== 'armed' || !Number.isFinite(fix?.t)) return false;
+  const proj = projectOnRoute([fix.lat, fix.lng], run.points, run.cum);
+  return Boolean(proj && proj.offRoute <= OFF_ROUTE_M && proj.progress < radiusM);
+}
+
+export function startRunAtFix(run, fix, radiusM = MANUAL_START_RADIUS_M) {
+  if (!canStartRunAtFix(run, fix, radiusM)) return false;
+  const proj = projectOnRoute([fix.lat, fix.lng], run.points, run.cum);
+  run.state = 'running';
+  run.startTime = fix.t;
+  run.maxProgress = proj.progress;
+  run.lastFix = { t: fix.t, progress: proj.progress };
+  return true;
+}
+
+// Swap the unfinished portion of a live run onto a replacement route. Completed
+// sector timestamps and the original start time stay intact, so the clock never
+// resets while an off-route driver accepts a continuation.
+export function continueRunOnRoute(run, replacement, fix, resumeProgress = null) {
+  if (!run || run.state !== 'running' || !replacement?.points?.length ||
+      !replacement?.cum?.length || !Number.isFinite(fix?.t)) return false;
+  const proj = projectOnRoute([fix.lat, fix.lng], replacement.points, replacement.cum,
+    resumeProgress);
+  if (!proj || proj.offRoute > OFF_ROUTE_M) return false;
+
+  const total = replacement.cum.at(-1);
+  const progress = resumeProgress ?? proj.progress;
+  if (!Number.isFinite(progress) || progress < 0 || progress > total) return false;
+  run.points = replacement.points;
+  run.cum = replacement.cum;
+  run.total = total;
+  run.ends = [...replacement.sectorBoundaries, total];
+  run.closedLoop = false;
+  run.maxProgress = progress;
+  run.lastFix = { t: fix.t, progress };
+  run.sectorTimes = Array.from({ length: run.ends.length },
+    (_, index) => run.sectorTimes[index] ?? null);
+  return true;
 }
 
 function isLoopWrap(run, progress) {

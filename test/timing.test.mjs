@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { haversine, cumulativeDistances, projectOnRoute, pointAtDistance }
   from '../js/geo.js';
-import { createRun, feedFix, classifySector, fmtTime, fmtDelta } from '../js/timing.js';
+import { createRun, feedFix, startRunAtFix, continueRunOnRoute, elapsed,
+  classifySector, fmtTime, fmtDelta } from '../js/timing.js';
 
 // ---- fixture: 3 km straight route heading north, points every 100 m ----
 const M_PER_DEG_LAT = 111195;
@@ -160,6 +161,41 @@ test('run does not start away from the start line', () => {
   assert.equal(feedFix(run, { ...posAt(800), t: 0 }), null);
   assert.equal(run.state, 'armed');
   assert.equal(feedFix(run, { ...posAt(10), t: 5000 }), 'start');
+});
+
+test('manual start can launch early near the start line', () => {
+  const run = createRun(makeRoute());
+  assert.equal(startRunAtFix(run, { ...posAt(100), t: 5000 }), true);
+  assert.equal(run.state, 'running');
+  assert.equal(run.startTime, 5000);
+
+  const tooFar = createRun(makeRoute());
+  assert.equal(startRunAtFix(tooFar, { ...posAt(300), t: 5000 }), false);
+  assert.equal(tooFar.state, 'armed');
+});
+
+test('continuing on a replacement route preserves elapsed time and completed sectors', () => {
+  const run = createRun(makeRoute());
+  feedFix(run, { ...posAt(0), t: 1000 });
+  feedFix(run, { ...posAt(1100), t: 71000 });
+  const startTime = run.startTime;
+  const firstCrossing = run.crossings[0];
+  const replacementPoints = [...points.slice(0, 12), ...points.slice(12).map(([lat, lng]) => [lat, lng + 0.001])];
+  const replacementCum = cumulativeDistances(replacementPoints);
+
+  assert.equal(continueRunOnRoute(run, {
+    points: replacementPoints,
+    cum: replacementCum,
+    sectorBoundaries: [1000, 2200],
+  }, { lat: replacementPoints[11][0], lng: replacementPoints[11][1], t: 80000 }, 1100), true);
+  assert.equal(run.startTime, startTime);
+  assert.equal(run.crossings[0], firstCrossing);
+  assert.equal(elapsed(run, 90000), 89000);
+  assert.equal(run.total, replacementCum.at(-1));
+  assert.equal(run.maxProgress, 1100);
+  const finish = replacementPoints.at(-1);
+  assert.equal(feedFix(run, { lat: finish[0], lng: finish[1], t: 220000 }), 'finish');
+  assert.equal(run.state, 'finished');
 });
 
 test('closed circuit saves a lap and keeps timing the next one', () => {

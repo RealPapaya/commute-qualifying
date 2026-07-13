@@ -1,9 +1,11 @@
 // Live run: GPS session (or simulator) feeding the pure timing engine,
 // wake lock, and the F1-style sector board.
 import { cumulativeDistances, pointAtDistance, haversine, projectOnRoute } from './geo.js';
-import { createRun, feedFix, elapsed, classifySector, fmtTime, fmtDelta,
-         MAX_ACCURACY_M, OFF_ROUTE_M } from './timing.js';
-import { allTimeBests, saveRun, newId, listRuns } from './store.js';
+import { createRun, feedFix, elapsed, classifySector, fmtTime, fmtDelta, canStartRunAtFix,
+         startRunAtFix, continueRunOnRoute, MAX_ACCURACY_M, OFF_ROUTE_M,
+         MANUAL_START_RADIUS_M } from './timing.js';
+import { allTimeBests, saveRun, saveRoute, newId, listRuns } from './store.js';
+import { createContinuationRoute, requestRoadContinuation } from './routeContinuation.js';
 import { renderTrackDiagram } from './trackDiagram.js';
 import { resetTrackDiagramView } from './trackDiagramInteraction.js';
 import { initSummary, showSummary } from './summary.js';
@@ -19,7 +21,7 @@ let clockTimer = null;
 let simNow = null;         // simulated clock when replaying
 let simClockAnchorTime = 0;
 let simClockAnchorReal = null;
-let onRunSaved = null, onReplanRoute = null;
+let onRunSaved = null, onRouteContinued = null;
 let cursorType = 'dot';
 let cursorLatLng = null;
 let cursorHeading = 0;
@@ -27,6 +29,8 @@ let mapMode = 'street';
 let trackCursorDistance = null;
 let offRouteFlagActive = false;
 let offRoutePromptDismissed = false;
+let latestFix = null;
+let continuationPending = false;
 let followUser = false;
 let trackFollowZoom = 2.4;
 
@@ -72,15 +76,17 @@ const VEHICLE_MODELS = {
 
 export function initRun(callbacks) {
   onRunSaved = callbacks.onRunSaved;
-  onReplanRoute = callbacks.onReplanRoute;
+  onRouteContinued = callbacks.onRouteContinued;
   map = L.map('run-map', { zoomControl: false }).setView([25.04, 121.53], 13);
   window._runMap = map; // test hook (e2e driver)
   addBaseMap(map);
 
   $('btn-arm').addEventListener('click', armGps);
   $('btn-abort').addEventListener('click', () => stopSession('Aborted.'));
-  $('btn-replan-route').addEventListener('click', replanRoute);
+  $('btn-replan-route').addEventListener('click', continueOnNewRoute);
   $('btn-wait-track').addEventListener('click', waitForTrack);
+  $('btn-manual-start').addEventListener('click', manualStart);
+  $('btn-restart-run').addEventListener('click', restartRun);
   $('btn-simulate').addEventListener('click', simulate);
   $('btn-follow-user').addEventListener('click', toggleFollowUser);
   $('run-map-mode').addEventListener('change', () => setMapMode(selectedMapMode(), { resetFilters: true }));
@@ -98,11 +104,21 @@ export function openRun(r) {
   stopSession();
   route = { ...r, cum: cumulativeDistances(r.points) };
   trackCursorDistance = null;
+  latestFix = null;
   resetOffRouteFlag();
+  updateManualStartControls();
   setMapMode(selectedMapMode(), { resetFilters: true });
   bests = allTimeBests(route.id, route.sectorBoundaries.length + 1, route.timingVersion);
   sessionBests = route.sectorBoundaries.map(() => null).concat([null]);
 
+  drawRunRoute();
+
+  setStatus('Press ARM, then drive. Timing starts when you cross the start line.', '');
+  $('run-clock').textContent = fmtTime(null);
+  renderBoard();
+}
+
+function drawRunRoute() {
   if (routeLayer) routeLayer.remove();
   routeLayer = L.layerGroup().addTo(map);
   L.polyline(route.points, {
@@ -128,10 +144,6 @@ export function openRun(r) {
     map.invalidateSize();
     map.fitBounds(L.latLngBounds(route.points), { padding: [30, 30] });
   }, 50);
-
-  setStatus('Press ARM, then drive. Timing starts when you cross the start line.', '');
-  $('run-clock').textContent = fmtTime(null);
-  renderBoard();
 }
 
 function hideTrackDiagram() {
@@ -402,11 +414,42 @@ function waitForTrack() {
   setStatus('YELLOW FLAG — waiting until GPS returns to the trace.', 'yellow');
 }
 
-function replanRoute() {
-  const routeId = route?.id;
-  resetOffRouteFlag();
-  stopSession('Replanning route.');
-  if (routeId) onReplanRoute?.(routeId);
+async function continueOnNewRoute() {
+  if (!run || run.state !== 'running' || !latestFix || continuationPending) return;
+  const targetRun = run;
+  const sourceRoute = route;
+  const acceptedFix = { ...latestFix };
+  const currentPoint = [acceptedFix.lat, acceptedFix.lng];
+  continuationPending = true;
+  $('btn-replan-route').disabled = true;
+  setStatus('YELLOW FLAG — building a new route while the clock keeps running.', 'yellow');
+
+  try {
+    const roadPoints = await requestRoadContinuation(currentPoint, sourceRoute.points.at(-1));
+    if (run !== targetRun || route !== sourceRoute) return;
+    const continuation = createContinuationRoute(
+      sourceRoute, targetRun, currentPoint, roadPoints, newId());
+    const liveRoute = { ...continuation.route, cum: continuation.cum };
+    if (!continueRunOnRoute(targetRun, liveRoute, acceptedFix, continuation.resumeProgress)) {
+      throw new Error('GPS position could not be attached to the new route');
+    }
+
+    route = liveRoute;
+    saveRoute(continuation.route);
+    bests = allTimeBests(route.id, route.sectorBoundaries.length + 1, route.timingVersion);
+    sessionBests = route.sectorBoundaries.map(() => null).concat([null]);
+    resetOffRouteFlag();
+    drawRunRoute();
+    updateTrackCursor();
+    renderBoard();
+    setStatus('LIVE — new route opened; timing continued without a reset.', 'live');
+    onRouteContinued?.(continuation.route);
+  } catch {
+    setStatus('YELLOW FLAG — unable to open a new route. Timing is still running.', 'yellow');
+  } finally {
+    continuationPending = false;
+    $('btn-replan-route').disabled = false;
+  }
 }
 
 function clearOffRouteFlag() {
@@ -437,12 +480,49 @@ function fmtDistance(m) {
   return m >= 1000 ? `${(m / 1000).toFixed(2)} km` : `${Math.round(m)} m`;
 }
 
+function manualStart() {
+  if (!run || run.state !== 'armed' || !latestFix) return;
+  const fix = { ...latestFix, t: Date.now() };
+  if (!startRunAtFix(run, fix)) return;
+  setStatus('LIVE — started early from the current position.', 'live');
+  renderBoard();
+  updateManualStartControls(fix);
+}
+
+function restartRun() {
+  if (!run || run.state !== 'running' || !latestFix) return;
+  const fix = { ...latestFix, t: Date.now() };
+  const restarted = createRun(route);
+  if (!startRunAtFix(restarted, fix)) return;
+  run = restarted;
+  resetOffRouteFlag();
+  setStatus('LIVE — timer restarted from the current position.', 'live');
+  $('run-clock').textContent = fmtTime(0);
+  renderBoard();
+  updateManualStartControls(fix);
+}
+
+function updateManualStartControls(fix = latestFix) {
+  const point = fix && route ? [fix.lat, fix.lng] : null;
+  const projection = point ? projectOnRoute(point, route.points, route.cum) : null;
+  const nearStart = simTimer == null && projection && projection.offRoute <= OFF_ROUTE_M &&
+    projection.progress < MANUAL_START_RADIUS_M &&
+    haversine(point, route.points[0]) < MANUAL_START_RADIUS_M;
+  const canStart = nearStart && run?.state === 'armed' && canStartRunAtFix(run, fix);
+  const canRestart = nearStart && run?.state === 'running';
+  $('btn-manual-start').hidden = !canStart;
+  $('btn-restart-run').hidden = !canRestart;
+  $('run-manual-actions').hidden = !canStart && !canRestart;
+}
+
 function handleFix(fix) {
   if (!run) return;
+  latestFix = fix;
   const ev = feedFix(run, fix);
 
   showCursor([fix.lat, fix.lng]);
   updateTrackCursor();
+  updateManualStartControls(fix);
 
   if (ev === 'offroute') {
     showOffRouteFlag();
@@ -513,6 +593,7 @@ function stopSession(statusMsg, keepBoard = false) {
   simClockAnchorReal = null;
   wakeLock?.release().catch(() => {});
   wakeLock = null;
+  latestFix = null;
   resetOffRouteFlag();
   if (!keepBoard) {
     run = null;
@@ -524,6 +605,7 @@ function stopSession(statusMsg, keepBoard = false) {
   }
   $('btn-arm').disabled = false;
   $('btn-abort').hidden = true;
+  updateManualStartControls();
   $('gps-info').textContent = '';
   if (statusMsg) setStatus(statusMsg, '');
 }
