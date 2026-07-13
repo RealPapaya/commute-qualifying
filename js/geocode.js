@@ -3,6 +3,45 @@
 const NOMINATIM = 'https://nominatim.openstreetmap.org/search';
 const NOMINATIM_REVERSE = 'https://nominatim.openstreetmap.org/reverse';
 
+function taiwanAddress(result) {
+  const address = result?.address;
+  if (!address || address.country_code?.toLowerCase() !== 'tw') return '';
+  const houseNumber = address.house_number?.trim();
+
+  const parts = [
+    address.city || address.state,
+    address.city_district || address.county,
+    address.village || address.suburb || address.quarter || address.neighbourhood,
+    address.road || address.pedestrian,
+    houseNumber && /號$/.test(houseNumber) ? houseNumber : houseNumber && `${houseNumber}號`,
+  ].map(part => part?.trim()).filter(Boolean);
+
+  return parts.filter((part, index) => part !== parts[index - 1]).join('');
+}
+
+function isTaiwanLandmark(result, name, addressText) {
+  if (!name || !addressText || normalizeSearchText(name) === normalizeSearchText(addressText)) {
+    return false;
+  }
+  const address = result.address ?? {};
+  const addressNames = [
+    address.house_number,
+    address.road,
+    address.pedestrian,
+    address.village,
+    address.suburb,
+    address.quarter,
+    address.neighbourhood,
+    address.city_district,
+    address.county,
+    address.city,
+    address.state,
+    address.postcode,
+    address.country,
+  ].map(normalizeSearchText);
+  return !addressNames.includes(normalizeSearchText(name));
+}
+
 function placeFromResult(result) {
   if (result?.lat === '' || result?.lat == null || result?.lon === '' || result?.lon == null) {
     return null;
@@ -14,8 +53,18 @@ function placeFromResult(result) {
   }
   const displayName = result.display_name?.trim() || '';
   const displayParts = displayName.split(',').map(part => part.trim()).filter(Boolean);
-  const name = result.name?.trim() || result.namedetails?.name?.trim() ||
+  const sourceName = result.name?.trim() || result.namedetails?.name?.trim() ||
     displayParts[0] || '已選取地點';
+  const addressText = taiwanAddress(result);
+  if (addressText) {
+    const landmark = isTaiwanLandmark(result, sourceName, addressText);
+    return {
+      point,
+      name: landmark ? sourceName : addressText,
+      ...(landmark && { detail: addressText }),
+    };
+  }
+  const name = sourceName;
   const detail = normalizeSearchText(name) === normalizeSearchText(displayParts[0])
     ? displayParts.slice(1).join(', ')
     : displayName;

@@ -110,3 +110,34 @@ test('parsePlaces: keeps the address detail for same-named suggestions', () => {
     { point: [25.01, 121.46], name: 'Central Park', detail: 'Banqiao, New Taipei' },
   ]);
 });
+
+test('parsePlaces: formats Taiwan addresses in Google order and keeps landmarks prominent', () => {
+  const [landmark, address] = parsePlaces([
+    {
+      lat: '25.0400', lon: '121.5119', name: '總統府',
+      display_name: '總統府, 122, 重慶南路一段, 建國里, 中正區, 臺北市, 100',
+      address: {
+        amenity: '總統府', house_number: '122', road: '重慶南路一段', village: '建國里',
+        city_district: '中正區', city: '臺北市', postcode: '100', country_code: 'tw',
+      },
+    },
+    {
+      lat: '25.0401', lon: '121.5120', name: '122',
+      display_name: '122, 重慶南路一段, 建國里, 中正區, 臺北市, 100',
+      address: {
+        house_number: '122', road: '重慶南路一段', village: '建國里',
+        city_district: '中正區', city: '臺北市', postcode: '100', country_code: 'tw',
+      },
+    },
+  ]);
+
+  assert.deepEqual(landmark, {
+    point: [25.04, 121.5119],
+    name: '總統府',
+    detail: '臺北市中正區建國里重慶南路一段122號',
+  });
+  assert.deepEqual(address, {
+    point: [25.0401, 121.512],
+    name: '臺北市中正區建國里重慶南路一段122號',
+  });
+});

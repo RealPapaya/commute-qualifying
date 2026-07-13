@@ -222,7 +222,7 @@ function selectedPlaceInputs() {
   return [
     { input: document.getElementById('place-start'), label: '起點', role: 'start' },
     ...viaInputs().map((input, index) => ({
-      input, label: `必經點 ${index + 1}`, role: 'via',
+      input, label: `必經點 ${index + 1}`, role: 'via', number: index + 1,
     })),
     { input: document.getElementById('place-end'), label: '終點', role: 'end' },
   ];
@@ -237,9 +237,14 @@ function clearPlacePins() {
   placeMarkers = [];
 }
 
-function waypointIcon(role) {
+function waypointIcon(role, number) {
   if (role === 'via') {
-    return L.divIcon({ className: 'wp-marker', iconSize: [12, 12] });
+    return L.divIcon({
+      className: 'wp-marker',
+      html: `<span>${number}</span>`,
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+    });
   }
   const svg = role === 'start'
     ? `<svg viewBox="0 0 36 44" aria-hidden="true"><path class="endpoint-pin" d="M18 1C8.6 1 1 8.6 1 18c0 12.4 17 25 17 25s17-12.6 17-25C35 8.6 27.4 1 18 1Z"/><path class="endpoint-symbol" d="m14 11 11 7-11 7Z"/></svg>`
@@ -255,7 +260,7 @@ function waypointIcon(role) {
 function redrawPlacePins(focusPlace = null) {
   clearPlacePins();
   redrawWaypoints();
-  selectedPlaceInputs().forEach(({ input, label, role }) => {
+  selectedPlaceInputs().forEach(({ input, label, role, number }) => {
     const place = selectedPlaces.get(input);
     const hasRouteMarker = role === 'start'
       ? route.waypoints.length > 0
@@ -265,7 +270,7 @@ function redrawPlacePins(focusPlace = null) {
       draggable: true,
       title: `${label}: ${placeLabel(place)}`,
       alt: `${label}: ${placeLabel(place)}`,
-      icon: waypointIcon(role),
+      icon: waypointIcon(role, number),
       riseOnHover: true,
       zIndexOffset: 1000,
     }).addTo(map);
@@ -317,7 +322,16 @@ function setupPlaceAutocomplete(input, inputWrap = input.parentElement) {
       option.type = 'button';
       option.className = 'place-suggestion';
       option.setAttribute('role', 'option');
-      option.textContent = placeLabel(place);
+      const title = document.createElement('span');
+      title.className = 'place-suggestion-title';
+      title.textContent = place.name;
+      option.append(title);
+      if (place.detail) {
+        const detail = document.createElement('small');
+        detail.className = 'place-suggestion-detail';
+        detail.textContent = place.detail;
+        option.append(detail);
+      }
       option.addEventListener('click', () => {
         input.value = placeLabel(place);
         selectedPlaces.set(input, place);
@@ -727,7 +741,7 @@ function redrawWaypoints() {
       draggable: true,
       title: label,
       alt: label,
-      icon: waypointIcon(role),
+      icon: waypointIcon(role, i),
     }).addTo(map);
     m.on('dragend', () => {
       const point = [m.getLatLng().lat, m.getLatLng().lng];

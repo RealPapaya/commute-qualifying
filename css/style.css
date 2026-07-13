@@ -1270,6 +1270,21 @@ body.home-active #topbar {
   outline: 0;
 }
 
+.place-suggestion-title,
+.place-suggestion-detail {
+  display: block;
+}
+
+.place-suggestion-title {
+  font-weight: 700;
+}
+
+.place-suggestion-detail {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
 .place-via-list {
   display: grid;
   gap: 5px;
@@ -1389,14 +1404,18 @@ body.home-active #topbar {
 }
 
 .wp-marker {
-  width: 14px !important;
-  height: 14px !important;
-  border: 3px solid #f7f8f8;
+  display: grid;
+  width: 28px !important;
+  height: 28px !important;
+  place-items: center;
+  border: 2px solid #101317;
   border-radius: 50%;
-  background: var(--accent);
-  box-shadow:
-    0 0 0 5px rgba(225, 6, 0, 0.22),
-    0 8px 18px rgba(0, 0, 0, 0.54);
+  background: #fff;
+  color: #101317;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.54);
 }
 
 .route-endpoint-marker {
