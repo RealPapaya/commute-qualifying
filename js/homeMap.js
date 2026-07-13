@@ -1,14 +1,60 @@
 import { addBaseMap } from './baseMap.js';
+import { waypointBearings } from './routeRouting.js';
 
-const LOCATIONS = [
+export const HOME_LOCATIONS = [
   { name: 'Taipei', center: [25.0375, 121.5637], zoom: 14 },
+  { name: 'Kaohsiung', center: [22.6273, 120.3014], zoom: 14 },
+  { name: 'Taichung', center: [24.1477, 120.6736], zoom: 14 },
+  { name: 'Tainan', center: [22.9997, 120.2270], zoom: 14 },
+  { name: 'Hsinchu', center: [24.8138, 120.9675], zoom: 14 },
   { name: 'Tokyo', center: [35.6764, 139.7631], zoom: 14 },
+  { name: 'Osaka', center: [34.6937, 135.5023], zoom: 14 },
+  { name: 'Kyoto', center: [35.0116, 135.7681], zoom: 14 },
+  { name: 'Yokohama', center: [35.4437, 139.6380], zoom: 14 },
   { name: 'Seoul', center: [37.5665, 126.9780], zoom: 14 },
+  { name: 'Busan', center: [35.1796, 129.0756], zoom: 14 },
   { name: 'Singapore', center: [1.2903, 103.8519], zoom: 14 },
+  { name: 'Hong Kong', center: [22.3193, 114.1694], zoom: 14 },
+  { name: 'Bangkok', center: [13.7563, 100.5018], zoom: 14 },
+  { name: 'Chiang Mai', center: [18.7883, 98.9853], zoom: 14 },
+  { name: 'Kuala Lumpur', center: [3.1390, 101.6869], zoom: 14 },
+  { name: 'Penang', center: [5.4141, 100.3288], zoom: 14 },
+  { name: 'Jakarta', center: [-6.2088, 106.8456], zoom: 14 },
+  { name: 'Manila', center: [14.5995, 120.9842], zoom: 14 },
+  { name: 'Hanoi', center: [21.0278, 105.8342], zoom: 14 },
+  { name: 'Ho Chi Minh City', center: [10.8231, 106.6297], zoom: 14 },
   { name: 'Paris', center: [48.8566, 2.3522], zoom: 14 },
+  { name: 'Lyon', center: [45.7640, 4.8357], zoom: 14 },
   { name: 'London', center: [51.5074, -0.1278], zoom: 14 },
+  { name: 'Manchester', center: [53.4808, -2.2426], zoom: 14 },
   { name: 'New York', center: [40.7484, -73.9857], zoom: 14 },
+  { name: 'Los Angeles', center: [34.0522, -118.2437], zoom: 14 },
+  { name: 'Chicago', center: [41.8781, -87.6298], zoom: 14 },
+  { name: 'San Francisco', center: [37.7749, -122.4194], zoom: 14 },
+  { name: 'Seattle', center: [47.6062, -122.3321], zoom: 14 },
+  { name: 'Vancouver', center: [49.2827, -123.1207], zoom: 14 },
+  { name: 'Montreal', center: [45.5019, -73.5674], zoom: 14 },
   { name: 'Barcelona', center: [41.3874, 2.1686], zoom: 14 },
+  { name: 'Madrid', center: [40.4168, -3.7038], zoom: 14 },
+  { name: 'Lisbon', center: [38.7223, -9.1393], zoom: 14 },
+  { name: 'Porto', center: [41.1579, -8.6291], zoom: 14 },
+  { name: 'Milan', center: [45.4642, 9.1900], zoom: 14 },
+  { name: 'Rome', center: [41.9028, 12.4964], zoom: 14 },
+  { name: 'Berlin', center: [52.5200, 13.4050], zoom: 14 },
+  { name: 'Munich', center: [48.1351, 11.5820], zoom: 14 },
+  { name: 'Amsterdam', center: [52.3676, 4.9041], zoom: 14 },
+  { name: 'Prague', center: [50.0755, 14.4378], zoom: 14 },
+  { name: 'Vienna', center: [48.2082, 16.3738], zoom: 14 },
+  { name: 'São Paulo', center: [-23.5505, -46.6333], zoom: 14 },
+  { name: 'Rio de Janeiro', center: [-22.9068, -43.1729], zoom: 14 },
+  { name: 'Buenos Aires', center: [-34.6037, -58.3816], zoom: 14 },
+  { name: 'Santiago', center: [-33.4489, -70.6693], zoom: 14 },
+  { name: 'Medellín', center: [6.2442, -75.5812], zoom: 14 },
+  { name: 'Sydney', center: [-33.8688, 151.2093], zoom: 14 },
+  { name: 'Melbourne', center: [-37.8136, 144.9631], zoom: 14 },
+  { name: 'Auckland', center: [-36.8509, 174.7645], zoom: 14 },
+  { name: 'Cape Town', center: [-33.9249, 18.4241], zoom: 14 },
+  { name: 'Johannesburg', center: [-26.2041, 28.0473], zoom: 14 },
 ];
 
 const FLY_MS = 6000;
@@ -33,13 +79,12 @@ export function initHomeMap() {
 
   let generation = 0;
   let courseLayer = null;
-  let previousLocation = null;
+  const nextLocation = createLocationPicker();
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   async function play(sequence) {
     while (sequence === generation) {
-      const location = randomLocation(previousLocation);
-      previousLocation = location.name;
+      const location = nextLocation();
       window._homeMapLocation = location.name;
 
       courseLayer?.remove();
@@ -105,20 +150,28 @@ export function courseWaypoints([lat, lng], type, random = Math.random) {
 
 async function fetchRoadCourse(waypoints) {
   const coordinates = waypoints.map(([lat, lng]) => `${lng},${lat}`).join(';');
+  const baseUrl =
+    `https://router.project-osrm.org/route/v1/driving/${coordinates}` +
+    '?overview=full&geometries=geojson';
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
   try {
-    const response = await fetch(
-      `https://router.project-osrm.org/route/v1/driving/${coordinates}?overview=full&geometries=geojson`,
-      { signal: controller.signal });
-    if (!response.ok) throw new Error(`OSRM ${response.status}`);
-    const data = await response.json();
-    const route = data.routes?.[0]?.geometry?.coordinates;
+    const bearings = waypointBearings(waypoints);
+    let route = await requestRoadCourse(
+      `${baseUrl}&bearings=${encodeURIComponent(bearings)}`, controller.signal);
+    if (!route) route = await requestRoadCourse(baseUrl, controller.signal);
     if (!route?.length) throw new Error('OSRM returned no route');
     return route.map(([lng, lat]) => [lat, lng]);
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function requestRoadCourse(url, signal) {
+  const response = await fetch(url, { signal });
+  if (!response.ok) return null;
+  const data = await response.json();
+  return data.code === 'Ok' ? data.routes?.[0]?.geometry?.coordinates : null;
 }
 
 function drawCourse(map, points, duration) {
@@ -148,9 +201,24 @@ function animatePath(layer, duration) {
   path.style.strokeDashoffset = '0';
 }
 
-function randomLocation(previousName) {
-  const choices = LOCATIONS.filter(location => location.name !== previousName);
-  return choices[Math.floor(Math.random() * choices.length)];
+export function createLocationPicker(locations = HOME_LOCATIONS, random = Math.random) {
+  let bag = [];
+  let previousName = null;
+  return () => {
+    if (!bag.length) {
+      bag = [...locations];
+      for (let index = bag.length - 1; index > 0; index -= 1) {
+        const swapIndex = Math.floor(random() * (index + 1));
+        [bag[index], bag[swapIndex]] = [bag[swapIndex], bag[index]];
+      }
+      if (bag.length > 1 && bag.at(-1).name === previousName) {
+        [bag[0], bag[bag.length - 1]] = [bag.at(-1), bag[0]];
+      }
+    }
+    const location = bag.pop();
+    previousName = location?.name ?? null;
+    return location;
+  };
 }
 
 function randomNearby([lat, lng]) {
