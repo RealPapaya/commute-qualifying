@@ -8,6 +8,7 @@ import { saveRoute, getRoute, newId } from './store.js';
 import { addBaseMap } from './baseMap.js';
 import { reversePlace, searchPlace, searchPlaces } from './geocode.js';
 import { acceptedRecordingPoint } from './gpsRouteRecorder.js';
+import { waypointBearings } from './routeRouting.js';
 
 const OSRM = 'https://router.project-osrm.org/route/v1/driving/';
 
@@ -19,6 +20,7 @@ let afterRebuildHandlers = []; // hooks run once the polyline/markers are freshl
 let placeSearchSeq = 0;
 let placeSuggestionId = 0;
 const selectedPlaces = new WeakMap();
+const placeMoveSeq = new WeakMap();
 let recordingWatchId = null, recordingMarker = null;
 let recordingMode = false, lastRecordingPoint = null;
 let pendingPlaceInput = null;
@@ -187,6 +189,8 @@ function resetPlaceInputs() {
   const end = document.getElementById('place-end');
   start.value = '';
   end.value = '';
+  placeMoveSeq.set(start, (placeMoveSeq.get(start) ?? 0) + 1);
+  placeMoveSeq.set(end, (placeMoveSeq.get(end) ?? 0) + 1);
   selectedPlaces.delete(start);
   selectedPlaces.delete(end);
   start.closest('.place-input-row').hidden = true;
@@ -278,6 +282,7 @@ function redrawPlacePins(focusPlace = null) {
       const point = [marker.getLatLng().lat, marker.getLatLng().lng];
       selectedPlaces.set(input, { ...place, point });
       redrawPlacePins();
+      updateMovedPlace(input, point, { redrawPins: true });
     });
     marker.bindTooltip?.(label, { direction: 'top', offset: [0, -32] });
     placeMarkers.push(marker);
@@ -348,6 +353,7 @@ function setupPlaceAutocomplete(input, inputWrap = input.parentElement) {
   };
 
   input.addEventListener('input', () => {
+    placeMoveSeq.set(input, (placeMoveSeq.get(input) ?? 0) + 1);
     selectedPlaces.delete(input);
     pendingPlaceInput = input;
     redrawPlacePins();
@@ -382,6 +388,26 @@ function applySelectedPlace(input, place) {
   const zoom = Math.max(map.getZoom?.() ?? 0, 15);
   if (map.flyTo) map.flyTo(place.point, zoom, { duration: 0.35 });
   else map.setView(place.point, zoom);
+}
+
+async function updateMovedPlace(input, point, { redrawPins = false } = {}) {
+  if (!input) return;
+  const seq = (placeMoveSeq.get(input) ?? 0) + 1;
+  placeMoveSeq.set(input, seq);
+  const selected = selectedPlaces.get(input);
+  if (selected) selectedPlaces.set(input, { ...selected, point });
+
+  try {
+    const place = await reversePlace(point);
+    if (placeMoveSeq.get(input) !== seq) return;
+    const movedPlace = { ...place, point };
+    selectedPlaces.set(input, movedPlace);
+    input.value = placeLabel(movedPlace);
+    if (redrawPins) redrawPlacePins();
+    setPlaceStatus(`地址已更新：${placeLabel(movedPlace)}`);
+  } catch {
+    // Keep the moved coordinate and the last known label when reverse lookup is unavailable.
+  }
 }
 
 function rebuildRouteFromSelectedPlaces() {
@@ -654,9 +680,15 @@ async function rebuildGeometry() {
   if (route.snap && wps.length >= 2) {
     try {
       const coords = wps.map(p => `${p[1]},${p[0]}`).join(';');
-      const res = await fetch(`${OSRM}${coords}?overview=full&geometries=geojson`,
+      const baseUrl = `${OSRM}${coords}?overview=full&geometries=geojson`;
+      const bearings = waypointBearings(wps);
+      let res = await fetch(`${baseUrl}&bearings=${encodeURIComponent(bearings)}`,
         { signal: AbortSignal.timeout(6000) });
-      const data = await res.json();
+      let data = await res.json();
+      if (data.code !== 'Ok') {
+        res = await fetch(baseUrl, { signal: AbortSignal.timeout(6000) });
+        data = await res.json();
+      }
       if (data.code === 'Ok' && data.routes?.[0]) {
         points = data.routes[0].geometry.coordinates.map(([lng, lat]) => [lat, lng]);
       } else {
@@ -754,6 +786,7 @@ function redrawWaypoints() {
       const selected = input && selectedPlaces.get(input);
       if (selected) selectedPlaces.set(input, { ...selected, point });
       rebuildGeometry();
+      updateMovedPlace(input, point);
     });
     m.on('dblclick', () => {
       route.waypoints.splice(i, 1);

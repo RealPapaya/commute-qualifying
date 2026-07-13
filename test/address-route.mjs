@@ -10,6 +10,7 @@ const places = {
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 const errors = [];
+const osrmRequests = [];
 page.on('pageerror', error => errors.push(String(error)));
 await page.addInitScript(() => {
   const markerStates = [];
@@ -42,14 +43,14 @@ await page.addInitScript(() => {
     },
     polyline: layer,
     marker(point, options) {
-      const state = { options, active: false };
+      const handlers = {};
+      const state = { options, active: false, point: [...point], handlers };
       markerStates.push(state);
       const marker = layer();
-      const handlers = {};
       marker.addTo = () => { state.active = true; return marker; };
       marker.remove = () => { state.active = false; };
       marker.on = (name, handler) => { handlers[name] = handler; return marker; };
-      marker.getLatLng = () => ({ lat: point[0], lng: point[1] });
+      marker.getLatLng = () => ({ lat: state.point[0], lng: state.point[1] });
       return marker;
     },
     circleMarker: layer,
@@ -68,22 +69,31 @@ await page.route('https://nominatim.openstreetmap.org/search**', async route => 
     body: JSON.stringify(place ? [{ lat: place[0], lon: place[1], display_name: place[2] }] : []),
   });
 });
-await page.route('https://nominatim.openstreetmap.org/reverse**', route => route.fulfill({
-  contentType: 'application/json',
-  body: JSON.stringify({
-    lat: '25.0375', lon: '121.5637', name: '信義路五段',
-    display_name: '信義路五段, 信義區, 臺北市',
-  }),
-}));
-await page.route('https://router.project-osrm.org/**', route => route.fulfill({
-  contentType: 'application/json',
-  body: JSON.stringify({
-    code: 'Ok',
-    routes: [{ geometry: { coordinates: [
-      [121.5170, 25.0478], [121.5637, 25.0375], [121.5654, 25.0330],
-    ] } }],
-  }),
-}));
+await page.route('https://nominatim.openstreetmap.org/reverse**', route => {
+  const lat = Number(new URL(route.request().url()).searchParams.get('lat'));
+  return route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify(lat > 25.05 ? {
+      lat: String(lat), lon: '121.5200', name: 'Moved address',
+      display_name: 'Moved address, Taipei',
+    } : {
+      lat: '25.0375', lon: '121.5637', name: '信義路五段',
+      display_name: '信義路五段, 信義區, 臺北市',
+    }),
+  });
+});
+await page.route('https://router.project-osrm.org/**', route => {
+  osrmRequests.push(route.request().url());
+  return route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({
+      code: 'Ok',
+      routes: [{ geometry: { coordinates: [
+        [121.5170, 25.0478], [121.5637, 25.0375], [121.5654, 25.0330],
+      ] } }],
+    }),
+  });
+});
 
 await page.goto('http://localhost:8080/');
 await page.evaluate(() => localStorage.clear());
@@ -211,8 +221,20 @@ await page.waitForFunction(() =>
     state.options?.icon?.className === 'wp-marker').length === 1,
   null, { timeout: 20000 });
 
+await page.evaluate(() => {
+  const start = window.__markerStates.find(state => state.active &&
+    state.options?.icon?.className?.includes('route-start-marker'));
+  start.point = [25.06, 121.52];
+  start.handlers.dragend();
+});
+await page.waitForFunction(() => document.getElementById('place-start').value
+  .includes('Moved address'));
+if (!osrmRequests.some(url => new URL(url).searchParams.get('bearings'))) {
+  throw new Error('route request did not constrain waypoint directions');
+}
+
 const status = await page.locator('#place-route-status').textContent();
-if (!status.includes('信義路五段')) throw new Error(`unexpected status: ${status}`);
+if (!status.includes('Moved address')) throw new Error(`unexpected status: ${status}`);
 await page.click('#btn-save-route');
 if (await page.locator('#route-name').count()) {
   throw new Error('route name should not be editable in the route editor');
