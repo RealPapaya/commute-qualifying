@@ -424,10 +424,11 @@ body.home-active #topbar {
 #view-routes .panel,
 #view-history .panel {
   flex: 1;
-  margin: 0 12px 0;
+  min-height: 0;
+  margin: 0 12px 12px;
   padding: 20px 16px calc(var(--nav-height) + 26px + env(safe-area-inset-bottom));
   background: var(--surface);
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  border-radius: var(--radius-lg);
 }
 
 .panel-head {
@@ -1153,13 +1154,6 @@ body.home-active #topbar {
   font-family: 'Archivo', system-ui, sans-serif;
 }
 
-.panel-head-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
 .new-route-options {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1863,7 +1857,7 @@ body.home-active #topbar {
 
   #view-routes .panel,
   #view-history .panel {
-    margin: 0 auto;
+    margin: 0 auto 12px;
     width: min(100%, 980px);
     padding: 26px 28px calc(var(--nav-height) + 30px);
   }

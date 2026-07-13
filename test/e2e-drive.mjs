@@ -226,7 +226,7 @@ await simulateLap('8-lap2'); // vs PB: mix of purple/green/yellow
 
 // ---- 7. history ----
 await page.click('#btn-back');
-await page.click('#btn-history');
+await page.click('[data-view="history"]');
 await shot('9-history');
 
 console.log('pageerrors:', errors.length ? errors : 'none');

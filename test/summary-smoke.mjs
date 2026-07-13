@@ -70,7 +70,7 @@ await page.waitForSelector('#summary-overlay', { state: 'hidden', timeout: 4000 
 console.log('close: ok');
 
 await page.click('#btn-back');
-await page.click('#btn-history');
+await page.click('[data-view="history"]');
 await page.waitForSelector('#summary-overlay .f1c-card', { timeout: 4000 });
 console.log('history tab summary: ok');
 

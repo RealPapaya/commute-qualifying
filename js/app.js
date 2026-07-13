@@ -58,7 +58,6 @@ function ensureRunLoaded() {
 }
 
 $('btn-back').addEventListener('click', () => showView('home'));
-$('btn-history').addEventListener('click', () => showView('history'));
 
 document.querySelectorAll('#tabs .tab').forEach(button => {
   button.addEventListener('click', () => {
