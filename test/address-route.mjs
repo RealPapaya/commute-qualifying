@@ -121,8 +121,8 @@ const editorDensity = await page.evaluate(() => {
     toolbarInPanel: document.querySelector('.editor-panel #editor-toolbar') !== null,
     routeActionTops: routeActions.map(action => action.getBoundingClientRect().top),
     routeActionOrder: routeActions.map(action => action.id),
-    statsAtBottom: document.querySelector('.editor-panel').lastElementChild
-      .classList.contains('editor-stats'),
+    actionsAtBottom: document.querySelector('.editor-panel').lastElementChild
+      .classList.contains('editor-route-actions'),
     buildButtonExists: Boolean(document.getElementById('btn-build-place-route')),
     toolHelp: document.getElementById('tool-help').textContent,
   };
@@ -131,13 +131,13 @@ if (editorDensity.panelPaddingTop > 10 ||
     editorDensity.toolHeight !== 34 ||
     editorDensity.addressHeight < 42 ||
     editorDensity.headMarginBottom > 6 ||
-    editorDensity.svgControls < 11 ||
+    editorDensity.svgControls < 9 ||
     !editorDensity.toolbarInHeader ||
     editorDensity.toolbarInPanel ||
     Math.max(...editorDensity.routeActionTops) - Math.min(...editorDensity.routeActionTops) > 1 ||
     editorDensity.routeActionOrder.join(',') !==
-      'btn-undo-wp,btn-clear-route,btn-save-route,btn-track-diagram' ||
-    !editorDensity.statsAtBottom ||
+      'btn-editor-advanced,btn-track-diagram,btn-save-route' ||
+    !editorDensity.actionsAtBottom ||
     editorDensity.buildButtonExists ||
     /choose/i.test(editorDensity.toolHelp)) {
   throw new Error(`editor layout is too loose: ${JSON.stringify(editorDensity)}`);

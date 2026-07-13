@@ -85,6 +85,7 @@ await page.route('https://nominatim.openstreetmap.org/reverse**', async route =>
     body: JSON.stringify({ lat, lon, display_name: `測試地址 ${lat}, ${lon}` }),
   });
 });
+await page.route('https://unpkg.com/**', route => route.fulfill({ body: '' }));
 
 try {
   await page.goto('http://127.0.0.1:8080/');
@@ -103,6 +104,7 @@ try {
       }));
       throw new Error(`editor did not open: ${JSON.stringify(state)}; pageerrors: ${errors.join('\n')}`);
     });
+  await page.click('#btn-editor-advanced');
   await page.locator('#snap-toggle').locator('..').click();
   if (!await page.locator('#closed-loop-toggle').isDisabled()) {
     throw new Error('closed-loop toggle should be disabled before endpoints match');
@@ -113,6 +115,7 @@ try {
   await page.evaluate(() =>
     window._editorMap.fire('click', { latlng: { lat: 25.003, lng: 121.503 } }));
   await page.waitForFunction(() => document.getElementById('place-end').value.includes('測試地址'));
+  await page.waitForFunction(() => window.__markerOptions.some(option => option?.title === '終點'));
   if (!await page.locator('#closed-loop-toggle').isDisabled()) {
     throw new Error('closed-loop toggle enabled while endpoints differ');
   }

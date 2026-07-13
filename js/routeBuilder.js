@@ -46,10 +46,9 @@ export function initEditor(callbacks) {
     btn.addEventListener('click', () => setTool(btn.dataset.tool));
   });
   document.getElementById('snap-toggle').addEventListener('change', rebuildGeometry);
-  document.getElementById('btn-undo-wp').addEventListener('click', undoWaypoint);
-  document.getElementById('btn-clear-route').addEventListener('click', clearTrace);
   document.getElementById('btn-clear-lights').addEventListener('click', clearLights);
   document.getElementById('btn-save-route').addEventListener('click', persist);
+  document.getElementById('btn-editor-advanced').addEventListener('click', toggleAdvanced);
   document.getElementById('btn-add-sector').addEventListener('click', () => changeSectorCount(+1));
   document.getElementById('btn-remove-sector').addEventListener('click', () => changeSectorCount(-1));
   document.getElementById('btn-track-diagram').addEventListener('click', showTrackDiagram);
@@ -641,20 +640,11 @@ async function onMapClick(e) {
   }
 }
 
-function undoWaypoint() {
-  if (route.waypoints.length > 2) route.waypoints.splice(route.waypoints.length - 2, 1);
-  else route.waypoints.pop();
-  rebuildGeometry();
-}
-
-function clearTrace() {
-  if (!confirm('Clear the whole trace (waypoints, lights, sectors)?')) return;
-  route.recorded = false;
-  pendingPlaceInput = null;
-  route.waypoints = [];
-  route.lights = [];
-  route.sectorBoundaries = [];
-  rebuildGeometry();
+function toggleAdvanced() {
+  const panel = document.getElementById('editor-advanced');
+  const button = document.getElementById('btn-editor-advanced');
+  panel.hidden = !panel.hidden;
+  button.setAttribute('aria-expanded', String(!panel.hidden));
 }
 
 function clearLights() {

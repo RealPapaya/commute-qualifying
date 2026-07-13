@@ -53,13 +53,19 @@ if (!await page.locator('#view-editor').evaluate(element => element.classList.co
 await page.click('.editor-panel .sheet-handle');
 
 const layout = await page.evaluate(() => {
-  const ids = ['btn-undo-wp', 'btn-clear-route', 'btn-save-route', 'btn-track-diagram'];
+  const ids = ['btn-editor-advanced', 'btn-track-diagram', 'btn-save-route'];
   const buttons = ids.map(id => document.getElementById(id));
+  const startBox = document.querySelector('[data-place-row="start"]').getBoundingClientRect();
+  const endBox = document.querySelector('[data-place-row="end"]').getBoundingClientRect();
+  const addBox = document.getElementById('btn-add-via').getBoundingClientRect();
   return {
     buildButtonExists: Boolean(document.getElementById('btn-build-place-route')),
     buttonTops: buttons.map(button => button.getBoundingClientRect().top),
     buttonOrder: [...document.querySelector('.editor-route-actions').children].map(button => button.id),
-    statsIsLast: document.querySelector('.editor-panel').lastElementChild?.classList.contains('editor-stats'),
+    removedButtonsExist: Boolean(document.getElementById('btn-undo-wp') || document.getElementById('btn-clear-route')),
+    actionsAreLast: document.querySelector('.editor-panel').lastElementChild?.classList.contains('editor-route-actions'),
+    advancedHidden: document.getElementById('editor-advanced').hidden,
+    endpointLayout: { startBox, endBox, addBox },
     helpText: document.getElementById('tool-help').textContent,
   };
 });
@@ -68,10 +74,32 @@ if (layout.buildButtonExists) throw new Error('place route build button is still
 if (Math.max(...layout.buttonTops) - Math.min(...layout.buttonTops) > 1) {
   throw new Error(`editor route actions are not on one row: ${layout.buttonTops.join(', ')}`);
 }
-if (layout.buttonOrder.join(',') !== 'btn-undo-wp,btn-clear-route,btn-save-route,btn-track-diagram') {
+if (layout.buttonOrder.join(',') !== 'btn-editor-advanced,btn-track-diagram,btn-save-route') {
   throw new Error(`unexpected editor action order: ${layout.buttonOrder.join(',')}`);
 }
-if (!layout.statsIsLast) throw new Error('route stats are not at the bottom of the editor panel');
+if (layout.removedButtonsExist) throw new Error('undo or clear is still present');
+if (!layout.actionsAreLast) throw new Error('the three editor actions are not the bottom row');
+if (!layout.advancedHidden) throw new Error('advanced panel should start collapsed');
+const { startBox, endBox, addBox } = layout.endpointLayout;
+if (startBox.top >= endBox.top || Math.abs(addBox.top - startBox.top) > 1 ||
+    Math.abs(addBox.bottom - endBox.bottom) > 1 || addBox.left <= startBox.right) {
+  throw new Error(`unexpected endpoint layout: ${JSON.stringify(layout.endpointLayout)}`);
+}
+await page.click('#btn-editor-advanced');
+if (!await page.locator('#editor-advanced').isVisible() ||
+    await page.locator('#btn-editor-advanced').getAttribute('aria-expanded') !== 'true') {
+  throw new Error('advanced panel did not open');
+}
+const advancedStructure = await page.evaluate(() => ({
+  headings: [...document.querySelectorAll('#editor-advanced h3')].map(heading => heading.id),
+  infoContainsStats: document.querySelector('[aria-labelledby="track-info-title"] #route-stats') !== null,
+  settingsContainControls: document.querySelector('[aria-labelledby="editor-settings-title"] #snap-toggle') !== null &&
+    document.querySelector('[aria-labelledby="editor-settings-title"] #closed-loop-toggle') !== null,
+}));
+if (advancedStructure.headings.join(',') !== 'track-info-title,editor-settings-title' ||
+    !advancedStructure.infoContainsStats || !advancedStructure.settingsContainControls) {
+  throw new Error(`unexpected advanced structure: ${JSON.stringify(advancedStructure)}`);
+}
 if (/choose/i.test(layout.helpText)) throw new Error(`choose hint is still visible: ${layout.helpText}`);
 if (errors.length) throw new Error(`page errors: ${errors.join('\n')}`);
 

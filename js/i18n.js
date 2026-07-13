@@ -4,6 +4,7 @@ const messages = {
   en: {
     traceLabel: 'Route', lightsLabel: 'Lights', sectorsLabel: 'Sectors', viaLabel: 'Via',
     undoLabel: 'Undo', sectorLabel: 'Sector', trackDiagramLabel: 'Diagram',
+    advanced: 'Advanced', trackInfo: 'Track information', settings: 'Settings',
     documentTitle: 'Commute Qualifying', language: 'Language', chinese: '中文', english: 'English',
     navRoutes: 'Routes', navEditor: 'Editor', navRun: 'Run', navHistory: 'History',
     homeKicker: 'CITY IN MOTION / 01', homeTitle: 'Turn every commute into a qualifying lap.',
@@ -40,6 +41,7 @@ const messages = {
   zh: {
     traceLabel: '路線', lightsLabel: '號誌', sectorsLabel: '分段', viaLabel: '必經點',
     undoLabel: '復原', sectorLabel: '分段', trackDiagramLabel: '賽道圖',
+    advanced: '進階', trackInfo: '賽道資訊', settings: '設定',
     documentTitle: '通勤排位賽', language: '語言', chinese: '中文', english: 'English',
     navRoutes: '路線', navEditor: '編輯', navRun: '計時', navHistory: '紀錄',
     homeKicker: '城市動態 / 01', homeTitle: '把每趟通勤，變成你的排位賽。',
