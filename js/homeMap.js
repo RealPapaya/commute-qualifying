@@ -1,4 +1,5 @@
 import { addBaseMap } from './baseMap.js';
+import { haversine } from './geo.js';
 import { waypointBearings } from './routeRouting.js';
 
 export const HOME_LOCATIONS = [
@@ -60,6 +61,10 @@ export const HOME_LOCATIONS = [
 const FLY_MS = 6000;
 const DRAW_MS = 4800;
 const HOLD_MS = 10000;
+const PRELOAD_TIMEOUT_MS = 8000;
+const VISIBLE_MAP_TIMEOUT_MS = 4000;
+const MAX_DETOUR_RATIO = 2.15;
+const MAX_BACKTRACK_RATIO = 0.18;
 
 export function initHomeMap() {
   const map = L.map('home-map', {
@@ -74,44 +79,60 @@ export function initHomeMap() {
     inertia: false,
   }).setView([24, 20], 3);
 
-  addBaseMap(map);
+  const renderedMap = addBaseMap(map).getMaplibreMap();
   window._homeMap = map;
 
   let generation = 0;
   let courseLayer = null;
   const nextLocation = createLocationPicker();
+  const preloadBaseMap = createBaseMapPreloader();
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  async function prepareCourse() {
+    const location = nextLocation();
+    const center = randomNearby(location.center);
+    const waypoints = courseWaypoints(center);
+    const [points] = await Promise.all([
+      fetchRoadCourse(waypoints).catch(() => waypoints),
+      preloadBaseMap(center, location.zoom),
+    ]);
+    return { location, center, points };
+  }
+
   async function play(sequence) {
+    let prepared = await prepareCourse();
+    if (sequence !== generation) return;
+
     while (sequence === generation) {
-      const location = nextLocation();
+      const { location, center, points } = prepared;
       window._homeMapLocation = location.name;
 
       courseLayer?.remove();
       courseLayer = null;
 
-      const center = randomNearby(location.center);
       if (reducedMotion) {
         map.setView(center, location.zoom);
       } else {
+        const moveFinished = waitForMove(map, FLY_MS + 2000);
         map.flyTo(center, location.zoom, { duration: FLY_MS / 1000, easeLinearity: 0.18 });
-        await delay(FLY_MS);
+        await moveFinished;
         if (sequence !== generation) return;
       }
 
-      const courseType = Math.random() < 0.5 ? 'loop' : 'line';
-      const waypoints = courseWaypoints(center, courseType);
-      const points = await fetchRoadCourse(waypoints).catch(() => waypoints);
+      await waitForMapIdle(renderedMap, VISIBLE_MAP_TIMEOUT_MS);
       if (sequence !== generation) return;
 
-      window._homeCourseType = courseType;
+      window._homeCourseType = 'line';
       window._homeCoursePoints = points;
       courseLayer = drawCourse(map, points, reducedMotion ? 0 : DRAW_MS);
 
+      const nextPrepared = reducedMotion ? null : prepareCourse();
       if (!reducedMotion) await delay(DRAW_MS);
       if (sequence !== generation) return;
       await delay(HOLD_MS);
       if (reducedMotion) return;
+      prepared = await nextPrepared;
+      if (sequence !== generation) return;
     }
   }
 
@@ -127,51 +148,158 @@ export function initHomeMap() {
   };
 }
 
-export function courseWaypoints([lat, lng], type, random = Math.random) {
+export function courseWaypoints([lat, lng], random = Math.random) {
   const angle = random() * Math.PI * 2;
   const radius = 0.014 + random() * 0.009;
 
-  if (type === 'loop') {
-    const points = Array.from({ length: 4 }, (_, index) => {
-      const direction = angle + index * Math.PI / 2;
-      const scale = 0.82 + random() * 0.36;
-      return [lat + Math.sin(direction) * radius * scale,
-              lng + Math.cos(direction) * radius * scale];
-    });
-    return points.concat([[...points[0]]]);
-  }
-
   return [-1.4, -0.45, 0.45, 1.4].map((distance, index) => {
-    const sideways = index === 0 || index === 3 ? 0 : (random() - 0.5) * radius;
+    const sideways = index === 0 || index === 3 ? 0 : (random() - 0.5) * radius * 0.5;
     return [lat + Math.sin(angle) * radius * distance + Math.cos(angle) * sideways,
             lng + Math.cos(angle) * radius * distance - Math.sin(angle) * sideways];
   });
+}
+
+export function courseQuality(points) {
+  if (!Array.isArray(points) || points.length < 2) return null;
+  const start = points[0];
+  const end = points.at(-1);
+  const directDistance = haversine(start, end);
+  if (directDistance < 1) return null;
+
+  let routeDistance = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    routeDistance += haversine(points[index - 1], points[index]);
+  }
+
+  const refLat = (start[0] + end[0]) / 2 * Math.PI / 180;
+  const xScale = Math.cos(refLat);
+  const axisX = (end[1] - start[1]) * xScale;
+  const axisY = end[0] - start[0];
+  const axisLengthSquared = axisX ** 2 + axisY ** 2;
+  let previousProgress = 0;
+  let backtrack = 0;
+  points.slice(1).forEach(point => {
+    const pointX = (point[1] - start[1]) * xScale;
+    const pointY = point[0] - start[0];
+    const progress = (pointX * axisX + pointY * axisY) / axisLengthSquared;
+    if (progress < previousProgress) backtrack += previousProgress - progress;
+    previousProgress = progress;
+  });
+
+  return {
+    detourRatio: routeDistance / directDistance,
+    backtrackRatio: backtrack,
+  };
+}
+
+function pickDirectCourse(courses) {
+  return courses.map(points => ({ points, quality: courseQuality(points) }))
+    .filter(({ quality }) => quality && quality.detourRatio <= MAX_DETOUR_RATIO &&
+      quality.backtrackRatio <= MAX_BACKTRACK_RATIO)
+    .sort((a, b) => (a.quality.detourRatio + a.quality.backtrackRatio * 4) -
+      (b.quality.detourRatio + b.quality.backtrackRatio * 4))[0]?.points ?? null;
 }
 
 async function fetchRoadCourse(waypoints) {
   const coordinates = waypoints.map(([lat, lng]) => `${lng},${lat}`).join(';');
   const baseUrl =
     `https://router.project-osrm.org/route/v1/driving/${coordinates}` +
-    '?overview=full&geometries=geojson';
+    '?overview=full&geometries=geojson&alternatives=true&continue_straight=true';
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
   try {
     const bearings = waypointBearings(waypoints);
-    let route = await requestRoadCourse(
+    let courses = await requestRoadCourses(
       `${baseUrl}&bearings=${encodeURIComponent(bearings)}`, controller.signal);
-    if (!route) route = await requestRoadCourse(baseUrl, controller.signal);
-    if (!route?.length) throw new Error('OSRM returned no route');
-    return route.map(([lng, lat]) => [lat, lng]);
+    let route = pickDirectCourse(courses);
+    if (!route) {
+      courses = await requestRoadCourses(baseUrl, controller.signal);
+      route = pickDirectCourse(courses);
+    }
+    if (!route) throw new Error('OSRM returned no direct route');
+    return route;
   } finally {
     clearTimeout(timeout);
   }
 }
 
-async function requestRoadCourse(url, signal) {
+async function requestRoadCourses(url, signal) {
   const response = await fetch(url, { signal });
-  if (!response.ok) return null;
+  if (!response.ok) return [];
   const data = await response.json();
-  return data.code === 'Ok' ? data.routes?.[0]?.geometry?.coordinates : null;
+  if (data.code !== 'Ok') return [];
+  return (data.routes ?? []).map(route =>
+    route.geometry.coordinates.map(([lng, lat]) => [lat, lng]));
+}
+
+function createBaseMapPreloader() {
+  let preloadMap = null;
+  let renderedMap = null;
+
+  return async (center, zoom) => {
+    if (!preloadMap) {
+      // A second off-screen map warms the browser's tile cache while the
+      // visible map remains still on the current course.
+      const container = document.createElement('div');
+      container.setAttribute('aria-hidden', 'true');
+      Object.assign(container.style, {
+        position: 'fixed',
+        inset: '0',
+        opacity: '0',
+        pointerEvents: 'none',
+        transform: 'translateX(-200vw)',
+      });
+      document.body.append(container);
+      preloadMap = L.map(container, {
+        zoomControl: false,
+        attributionControl: false,
+        dragging: false,
+        fadeAnimation: false,
+        zoomAnimation: false,
+      }).setView(center, zoom);
+      renderedMap = addBaseMap(preloadMap).getMaplibreMap();
+    } else {
+      preloadMap.setView(center, zoom, { animate: false });
+    }
+    preloadMap.invalidateSize();
+    await waitForMapIdle(renderedMap, PRELOAD_TIMEOUT_MS);
+  };
+}
+
+function waitForMapIdle(map, timeoutMs) {
+  if (typeof map.loaded !== 'function' || typeof map.areTilesLoaded !== 'function') {
+    return Promise.resolve();
+  }
+  if (map.loaded() && map.areTilesLoaded()) return Promise.resolve();
+  return new Promise(resolve => {
+    let settled = false;
+    let timeout = null;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      map.off?.('idle', finish);
+      resolve();
+    };
+    map.on('idle', finish);
+    if (!settled) timeout = setTimeout(finish, timeoutMs);
+  });
+}
+
+function waitForMove(map, timeoutMs) {
+  return new Promise(resolve => {
+    let settled = false;
+    let timeout = null;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      map.off?.('moveend', finish);
+      resolve();
+    };
+    map.on('moveend', finish);
+    if (!settled) timeout = setTimeout(finish, timeoutMs);
+  });
 }
 
 function drawCourse(map, points, duration) {
