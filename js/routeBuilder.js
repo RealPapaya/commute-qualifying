@@ -90,14 +90,14 @@ export function onAfterRebuild(fn) {
   afterRebuildHandlers.push(fn);
 }
 
-export function openRoute(existing, { creationMode = 'plan' } = {}) {
+export function openRoute(existing, { creationMode = 'plan', name = '' } = {}) {
   stopGpsRecording({ quiet: true });
   placeSearchSeq += 1;
   pendingPlaceInput = null;
   recordingMode = creationMode === 'record' || existing?.recorded === true;
   route = existing ?? {
     id: newId(),
-    name: '',
+    name,
     waypoints: [],
     snap: true,
     points: [],

@@ -76,6 +76,7 @@ await page.reload();
 
 await page.click('[data-view="routes"]');
 await page.click('#btn-new-route');
+await page.fill('#new-route-name', 'GPS smoke route');
 await page.click('[data-new-route-mode="record"]');
 await page.waitForSelector('#gps-recording-panel:not([hidden])');
 if (await page.locator('#place-route-form').isVisible()) {
@@ -91,17 +92,16 @@ await page.click('#btn-record-light');
 await page.evaluate(() => window.__emitRecordedFix(25.0012, 121.5000));
 await page.click('#btn-stop-gps-recording');
 await page.click('#btn-save-route');
-await page.fill('#route-list [data-route-name]', 'GPS smoke route');
-await page.locator('#route-list [data-route-name]').press('Enter');
 
 const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('commute-qualifying-v1')).routes[0]);
-if (!saved.recorded || saved.snap !== false || saved.points.length !== 3 || saved.waypoints.length !== 3) {
+if (saved.name !== 'GPS smoke route' || !saved.recorded || saved.snap !== false || saved.points.length !== 3 || saved.waypoints.length !== 3) {
   throw new Error(`unexpected recorded route: ${JSON.stringify(saved)}`);
 }
 if (saved.sectorBoundaries.length !== 1 || saved.lights.length !== 1) {
   throw new Error(`recorded markers missing: ${JSON.stringify(saved)}`);
 }
 await page.click('#btn-new-route');
+await page.fill('#new-route-name', 'Planning route');
 await page.click('[data-new-route-mode="plan"]');
 if (!await page.locator('#place-route-form').isVisible() ||
     await page.locator('#gps-recording-panel').isVisible()) {

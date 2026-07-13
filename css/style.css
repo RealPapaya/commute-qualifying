@@ -1338,6 +1338,15 @@ body.home-active #topbar {
   display: none;
 }
 
+.new-route-name {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 6px;
+  color: var(--dim);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .place-via-list .place-input-row {
   transition: opacity 120ms ease, transform 120ms ease;
 }

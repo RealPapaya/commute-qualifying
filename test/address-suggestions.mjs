@@ -84,6 +84,7 @@ await page.evaluate(() => localStorage.clear());
 await page.reload();
 await page.click('[data-view="routes"]');
 await page.click('#btn-new-route');
+await page.fill('#new-route-name', 'Suggestion test route');
 await page.click('[data-new-route-mode="plan"]');
 
 await page.fill('#place-start', 'taipei');

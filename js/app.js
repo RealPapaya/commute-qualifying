@@ -66,24 +66,30 @@ document.querySelectorAll('#tabs .tab').forEach(button => {
 });
 
 const newRouteOptions = $('new-route-options');
+const newRouteName = $('new-route-name');
 
 $('btn-new-route').addEventListener('click', () => {
   const opening = newRouteOptions.hidden;
   newRouteOptions.hidden = !opening;
   $('btn-new-route').setAttribute('aria-expanded', String(opening));
+  if (opening) {
+    newRouteName.value = '';
+    newRouteName.focus();
+  }
 });
 
-document.querySelectorAll('[data-new-route-mode]').forEach(button => {
-  button.addEventListener('click', () => createNewRoute(button.dataset.newRouteMode));
+newRouteOptions.addEventListener('submit', event => {
+  event.preventDefault();
+  createNewRoute(event.submitter?.dataset.newRouteMode ?? 'plan', newRouteName.value.trim());
 });
 
-function createNewRoute(creationMode) {
+function createNewRoute(creationMode, name) {
   activeRouteId = null;
   editorLoadedId = null; // editor now holds an unsaved route
   enableTabs(true, false);
   newRouteOptions.hidden = true;
   $('btn-new-route').setAttribute('aria-expanded', 'false');
-  openRoute(null, { creationMode });
+  openRoute(null, { creationMode, name });
   showView('editor');
 }
 

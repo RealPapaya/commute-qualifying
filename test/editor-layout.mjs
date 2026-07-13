@@ -44,6 +44,7 @@ await page.goto('http://localhost:8080/');
 await page.evaluate(() => {
   document.querySelector('[data-view="routes"]').click();
   document.getElementById('btn-new-route').click();
+  document.getElementById('new-route-name').value = 'Layout test route';
   document.querySelector('[data-new-route-mode="plan"]').click();
 });
 await page.waitForTimeout(1000);

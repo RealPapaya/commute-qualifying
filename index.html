@@ -114,14 +114,19 @@
           <button id="btn-new-route" class="btn primary" aria-expanded="false" data-i18n="newRoute">+ New Route</button>
         </div>
       </div>
-      <div id="new-route-options" class="new-route-options" hidden>
-        <button class="new-route-choice" data-new-route-mode="plan">
+      <form id="new-route-options" class="new-route-options" hidden>
+        <label class="new-route-name" for="new-route-name">
+          <span data-i18n="routeName">Route name</span>
+          <input id="new-route-name" class="name-input" type="text" maxlength="40"
+            autocomplete="off" data-i18n-placeholder="routeName" placeholder="Route name">
+        </label>
+        <button type="submit" class="new-route-choice" data-new-route-mode="plan">
           <strong data-i18n="planAhead">Plan ahead</strong><span data-i18n="planAheadDesc">Trace on the map or build from places</span>
         </button>
-        <button class="new-route-choice" data-new-route-mode="record">
+        <button type="submit" class="new-route-choice" data-new-route-mode="record">
           <strong data-i18n="gpsRecord">GPS record</strong><span data-i18n="gpsRecordDesc">Drive the route and mark it live</span>
         </button>
-      </div>
+      </form>
       <ul id="route-list" class="route-list"></ul>
       <p class="hint" id="routes-empty" data-i18n="routesEmpty">No routes yet. Create one, then trace your commute on the map.</p>
     </div>

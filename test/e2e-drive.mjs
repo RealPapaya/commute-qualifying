@@ -40,6 +40,7 @@ await page.reload();
 // ---- 1. new route, frame the map on the commute area ----
 await page.click('[data-view="routes"]');
 await page.click('#btn-new-route');
+await page.fill('#new-route-name', 'E2E commute');
 await page.click('[data-new-route-mode="plan"]');
 await page.evaluate(([a, b]) => {
   window._editorMap.fitBounds(L.latLngBounds([a, b]).pad(0.15));

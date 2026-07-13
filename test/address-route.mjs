@@ -101,6 +101,7 @@ await page.reload();
 await page.click('[data-view="routes"]');
 await page.click('#btn-new-route');
 await page.waitForSelector('#new-route-options:not([hidden])');
+await page.fill('#new-route-name', '   ');
 await page.click('[data-new-route-mode="plan"]');
 await page.waitForFunction(() => document.getElementById('view-editor').classList.contains('active'));
 
@@ -231,9 +232,9 @@ if (!osrmRequests.some(url => new URL(url).searchParams.get('bearings'))) {
 const status = await page.locator('#place-route-status').textContent();
 if (!status.includes('Moved address')) throw new Error(`unexpected status: ${status}`);
 await page.click('#btn-save-route');
-if (await page.locator('#route-name').count()) {
-  throw new Error('route name should not be editable in the route editor');
-}
+const defaultName = await page.evaluate(() =>
+  JSON.parse(localStorage.getItem('commute-qualifying-v1')).routes[0].name);
+if (defaultName !== 'Unnamed route') throw new Error(`default route name was not saved: ${defaultName}`);
 await page.fill('#route-list [data-route-name]', '通勤測試路線');
 await page.locator('#route-list [data-route-name]').press('Enter');
 const savedName = await page.evaluate(() =>

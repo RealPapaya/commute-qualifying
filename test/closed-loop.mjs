@@ -95,6 +95,7 @@ try {
   await page.click('[data-view="routes"]');
   await page.click('#btn-new-route');
   await page.waitForSelector('#new-route-options:not([hidden])');
+  await page.fill('#new-route-name', 'Closed loop test');
   await page.click('[data-new-route-mode="plan"]');
   await page.waitForFunction(() => document.getElementById('view-editor').classList.contains('active'),
     null, { timeout: 5000 }).catch(async () => {
