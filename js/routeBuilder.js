@@ -60,9 +60,7 @@ export function initEditor(callbacks) {
   document.getElementById('btn-record-light').addEventListener('click', addRecordedLight);
   setupPlaceAutocomplete(document.getElementById('place-start'));
   setupPlaceAutocomplete(document.getElementById('place-end'));
-  document.querySelectorAll('[data-place-role]').forEach(button => {
-    button.addEventListener('click', () => beginPlaceSelection(button.dataset.placeRole));
-  });
+  document.getElementById('btn-add-via').addEventListener('click', beginViaSelection);
   document.getElementById('place-route-form').addEventListener('submit', event => {
     event.preventDefault();
     buildRouteFromPlaces();
@@ -172,15 +170,12 @@ function addViaInput(value = '') {
   return input;
 }
 
-function beginPlaceSelection(role) {
-  const input = role === 'via'
-    ? addViaInput()
-    : document.getElementById(`place-${role}`);
-  input.closest('.place-input-row').hidden = false;
+function beginViaSelection() {
+  const input = addViaInput();
   pendingPlaceInput = input;
   input.focus();
   updatePlaceControls();
-  setPlaceStatus(`請輸入${role === 'start' ? '起點' : role === 'end' ? '終點' : '必經點'}地址，或直接點地圖。`);
+  setPlaceStatus('請輸入必經點地址，或直接點地圖。');
 }
 
 function resetPlaceInputs() {
@@ -193,10 +188,8 @@ function resetPlaceInputs() {
   placeMoveSeq.set(end, (placeMoveSeq.get(end) ?? 0) + 1);
   selectedPlaces.delete(start);
   selectedPlaces.delete(end);
-  start.closest('.place-input-row').hidden = true;
-  end.closest('.place-input-row').hidden = true;
   document.getElementById('place-via-list').replaceChildren();
-  pendingPlaceInput = null;
+  pendingPlaceInput = start;
   setPlaceStatus('');
   const buildButton = document.getElementById('btn-build-place-route');
   if (buildButton) buildButton.disabled = false;
@@ -205,17 +198,16 @@ function resetPlaceInputs() {
 
 function updatePlaceControls() {
   const waiting = pendingPlaceInput && !selectedPlaces.has(pendingPlaceInput);
-  document.querySelectorAll('[data-place-role]').forEach(button => {
-    button.disabled = Boolean(waiting);
-    const isPendingRole = button.dataset.placeRole === 'via'
-      ? Boolean(pendingPlaceInput?.closest('#place-via-list'))
-      : document.getElementById(`place-${button.dataset.placeRole}`) === pendingPlaceInput;
-    button.classList.toggle('active', isPendingRole);
+  document.getElementById('btn-add-via').disabled = Boolean(waiting);
+  document.querySelectorAll('.place-input').forEach(input => {
+    input.classList.toggle('pending', input === pendingPlaceInput);
   });
-  document.getElementById('btn-place-start').classList.toggle(
-    'complete', selectedPlaces.has(document.getElementById('place-start')));
-  document.getElementById('btn-place-end').classList.toggle(
-    'complete', selectedPlaces.has(document.getElementById('place-end')));
+}
+
+function advancePlaceSelection(input) {
+  const end = document.getElementById('place-end');
+  pendingPlaceInput = input === document.getElementById('place-start') &&
+    !selectedPlaces.has(end) ? end : null;
 }
 
 function setPlaceStatus(message) {
@@ -340,7 +332,7 @@ function setupPlaceAutocomplete(input, inputWrap = input.parentElement) {
       option.addEventListener('click', () => {
         input.value = placeLabel(place);
         selectedPlaces.set(input, place);
-        pendingPlaceInput = null;
+        advancePlaceSelection(input);
         hide();
         applySelectedPlace(input, place);
         updatePlaceControls();
@@ -371,6 +363,10 @@ function setupPlaceAutocomplete(input, inputWrap = input.parentElement) {
         if (seq === searchSeq) hide();
       }
     }, 250);
+  });
+  input.addEventListener('focus', () => {
+    pendingPlaceInput = input;
+    updatePlaceControls();
   });
   input.addEventListener('keydown', event => {
     if (event.key === 'Escape') hide();
@@ -621,7 +617,7 @@ async function onMapClick(e) {
         if (seq !== placeSearchSeq || input !== pendingPlaceInput) return;
         input.value = placeLabel(place);
         selectedPlaces.set(input, place);
-        pendingPlaceInput = null;
+        advancePlaceSelection(input);
         applySelectedPlace(input, place);
         updatePlaceControls();
         setPlaceStatus(`已選定：${placeLabel(place)}`);

@@ -131,7 +131,7 @@ if (editorDensity.panelPaddingTop > 10 ||
     editorDensity.toolHeight !== 34 ||
     editorDensity.addressHeight < 42 ||
     editorDensity.headMarginBottom > 6 ||
-    editorDensity.svgControls < 12 ||
+    editorDensity.svgControls < 11 ||
     !editorDensity.toolbarInHeader ||
     editorDensity.toolbarInPanel ||
     Math.max(...editorDensity.routeActionTops) - Math.min(...editorDensity.routeActionTops) > 1 ||
@@ -143,14 +143,10 @@ if (editorDensity.panelPaddingTop > 10 ||
   throw new Error(`editor layout is too loose: ${JSON.stringify(editorDensity)}`);
 }
 
-if (await page.locator('[data-place-role]').count() !== 3) {
-  throw new Error('expected start, end, and via role buttons');
-}
-await page.evaluate(() => window._editorMap.fire('click', {
-  latlng: { lat: 25.0478, lng: 121.5170 },
-}));
-if (await page.evaluate(() => window.__markerStates.some(state => state.active))) {
-  throw new Error('map click added a route point before a point role was selected');
+if (await page.locator('[data-place-role]').count() !== 0 ||
+    !await page.locator('#place-start').evaluate(input => input.classList.contains('pending')) ||
+    !await page.locator('#btn-add-via').isDisabled()) {
+  throw new Error('route editor did not start in the simplified start-point state');
 }
 
 await page.click('[data-tool="light"]');
@@ -180,14 +176,11 @@ if (traceState.formHidden || !traceState.sectorHidden) {
   throw new Error('trace tool did not restore its route controls');
 }
 
-await page.click('#btn-place-start');
-if (!await page.locator('#btn-place-end').isDisabled() || !await page.locator('#btn-add-via').isDisabled()) {
-  throw new Error('new point buttons should stay locked until the current point is selected');
-}
 await page.fill('#place-start', '起點');
 await page.locator('#place-start + .place-suggestions .place-suggestion').click();
-if (await page.locator('#btn-add-via').isDisabled()) {
-  throw new Error('point buttons did not unlock after selecting the start');
+if (!await page.locator('#place-end').evaluate(input => input.classList.contains('pending')) ||
+    !await page.locator('#btn-add-via').isDisabled()) {
+  throw new Error('selecting the start did not advance to the end');
 }
 if (!await page.evaluate(() => window.__markerStates.some(state =>
   state.active &&
@@ -196,9 +189,11 @@ if (!await page.evaluate(() => window.__markerStates.some(state =>
   throw new Error('start-only marker should remain editable by dragging');
 }
 
-await page.click('#btn-place-end');
 await page.fill('#place-end', '終點');
 await page.locator('#place-end + .place-suggestions .place-suggestion').click();
+if (await page.locator('#btn-add-via').isDisabled()) {
+  throw new Error('via button did not unlock after selecting both endpoints');
+}
 
 await page.click('#btn-add-via');
 if (!await page.locator('#btn-add-via').isDisabled()) {

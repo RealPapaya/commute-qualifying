@@ -86,7 +86,6 @@ await page.click('[data-view="routes"]');
 await page.click('#btn-new-route');
 await page.click('[data-new-route-mode="plan"]');
 
-await page.click('#btn-place-start');
 await page.fill('#place-start', 'taipei');
 const suggestionTexts = await page.locator('#place-start + .place-suggestions .place-suggestion').allTextContents();
 if (new Set(suggestionTexts).size !== suggestionTexts.length) {
@@ -100,12 +99,11 @@ if (await page.locator('#place-start').inputValue() !==
 await page.waitForFunction(() => window.__markerStates.some(state => state.active &&
   state.options?.icon?.className?.includes('route-start-marker') &&
   state.options.icon.html.startsWith('<svg')));
+await page.fill('#place-end', 'tower');
+await page.locator('#place-end + .place-suggestions .place-suggestion').click();
 await page.click('#btn-add-via');
 await page.fill('#place-via-list .place-input', 'xinyi');
 await page.locator('#place-via-list .place-suggestion').click();
-await page.click('#btn-place-end');
-await page.fill('#place-end', 'tower');
-await page.locator('#place-end + .place-suggestions .place-suggestion').click();
 await page.waitForFunction(() => {
   const activeClasses = window.__markerStates.filter(state => state.active)
     .map(state => state.options?.icon?.className);

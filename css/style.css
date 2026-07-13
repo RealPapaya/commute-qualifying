@@ -1135,29 +1135,6 @@ body.home-active #topbar {
   margin: 6px 0;
 }
 
-.place-role-actions {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 5px;
-}
-
-.place-role-btn {
-  min-height: 30px;
-  padding: 3px 7px;
-  font-weight: 700;
-}
-
-.place-role-btn.active {
-  border-color: var(--bar);
-  background: var(--bar);
-  color: #fff;
-}
-
-.place-role-btn.complete {
-  border-color: var(--green);
-  color: var(--green);
-}
-
 .gps-recording-panel {
   display: grid;
   gap: 7px;
@@ -1219,6 +1196,26 @@ body.home-active #topbar {
   min-height: 42px;
   padding: 7px 10px;
   font-size: 13px;
+}
+
+.place-input.pending {
+  border-color: var(--bar);
+  box-shadow: 0 0 0 1px var(--bar);
+}
+
+.place-via-section {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 5px;
+}
+
+.place-add-via {
+  width: 32px;
+  min-height: 32px;
+  padding: 0;
+  font-size: 20px;
+  line-height: 1;
 }
 
 .place-input-wrap {

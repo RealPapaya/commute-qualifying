@@ -56,18 +56,26 @@ async function clickMap(latlng) {
 const stats = () => page.locator('#route-stats').textContent();
 
 // Place the two endpoints, then explicitly arm each red via point.
-await page.click('#btn-place-start');
 await clickMap(START);
 await page.waitForSelector('.route-start-marker');
-await page.click('#btn-place-end');
 await clickMap(END);
 await page.waitForSelector('.route-end-marker');
 for (let i = 0; i < [WP1, WP2].length; i++) {
   await page.click('#btn-add-via');
-  await clickMap([WP1, WP2][i]);
+  await page.evaluate(latlng => window._editorMap.fire('click', {
+    latlng: L.latLng(latlng),
+  }), [WP1, WP2][i]);
   await page.waitForFunction(n =>
     document.querySelectorAll('.wp-marker').length === n, i + 1,
-    { timeout: 20000 });
+    { timeout: 20000 }).catch(async () => {
+      const state = await page.evaluate(() => ({
+        markers: document.querySelectorAll('.wp-marker').length,
+        waypoints: window._editorMap ? document.getElementById('route-stats').textContent : '',
+        vias: [...document.querySelectorAll('#place-via-list .place-input')].map(input => input.value),
+        status: document.getElementById('place-route-status').textContent,
+      }));
+      throw new Error(`via ${i + 1} did not render: ${JSON.stringify(state)}; ${errors.join('\n')}`);
+    });
   console.log(`via${i + 1}:`, await stats());
 }
 console.log('traced:', await stats());

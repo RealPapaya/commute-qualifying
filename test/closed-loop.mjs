@@ -107,11 +107,9 @@ try {
   if (!await page.locator('#closed-loop-toggle').isDisabled()) {
     throw new Error('closed-loop toggle should be disabled before endpoints match');
   }
-  await page.click('#btn-place-start');
   await page.evaluate(() =>
     window._editorMap.fire('click', { latlng: { lat: 25.0, lng: 121.5 } }));
   await page.waitForFunction(() => document.getElementById('place-start').value.includes('測試地址'));
-  await page.click('#btn-place-end');
   await page.evaluate(() =>
     window._editorMap.fire('click', { latlng: { lat: 25.003, lng: 121.503 } }));
   await page.waitForFunction(() => document.getElementById('place-end').value.includes('測試地址'));

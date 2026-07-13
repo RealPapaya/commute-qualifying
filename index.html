@@ -150,17 +150,15 @@
         <p id="gps-recording-status" class="hint" role="status" aria-live="polite" data-i18n="readyRecord">Ready to record.</p>
       </section>
       <form id="place-route-form" class="place-route-form">
-        <div class="place-role-actions" aria-label="新增路徑點">
-          <button id="btn-place-start" type="button" class="btn place-role-btn" data-place-role="start"><svg class="ui-icon"><use href="#icon-start"></use></svg><span data-i18n="start">起點</span></button>
-          <button id="btn-place-end" type="button" class="btn place-role-btn" data-place-role="end"><svg class="ui-icon"><use href="#icon-finish"></use></svg><span data-i18n="end">終點</span></button>
-          <button id="btn-add-via" type="button" class="btn place-role-btn" data-place-role="via"><svg class="ui-icon"><use href="#icon-via"></use></svg><span data-i18n="viaLabel">必經點</span></button>
-        </div>
-        <div class="place-input-row" data-place-row="start" hidden>
+        <div class="place-input-row" data-place-row="start">
           <label for="place-start" data-i18n="start">起點</label>
           <input id="place-start" class="place-input" type="search" placeholder="輸入路名、地址或地標" autocomplete="street-address" data-i18n-placeholder="placePlaceholder">
         </div>
-        <div id="place-via-list" class="place-via-list"></div>
-        <div class="place-input-row" data-place-row="end" hidden>
+        <div class="place-via-section">
+          <div id="place-via-list" class="place-via-list"></div>
+          <button id="btn-add-via" type="button" class="btn place-add-via" title="新增必經點" aria-label="新增必經點">+</button>
+        </div>
+        <div class="place-input-row" data-place-row="end">
           <label for="place-end" data-i18n="end">終點</label>
           <input id="place-end" class="place-input" type="search" placeholder="輸入路名、地址或地標" autocomplete="street-address" data-i18n-placeholder="placePlaceholder">
         </div>
