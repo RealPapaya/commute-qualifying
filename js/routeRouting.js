@@ -21,3 +21,10 @@ export function waypointBearings(waypoints, range = 90, waypointKinds = []) {
     return direction === null ? '' : `${direction},${range}`;
   }).join(';');
 }
+
+export function shortestRoute(routes = []) {
+  return routes.reduce((shortest, route) => {
+    if (!route?.geometry || !Number.isFinite(route.distance)) return shortest;
+    return !shortest || route.distance < shortest.distance ? route : shortest;
+  }, null);
+}

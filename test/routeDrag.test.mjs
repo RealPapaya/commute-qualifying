@@ -5,6 +5,7 @@ import {
   findInsertIndex,
   moveEndpoint,
   normalizeWaypointKinds,
+  replaceShapePointInLeg,
 } from '../js/routeDrag.js';
 import { pointAtDistance, cumulativeDistances, projectOnRoute } from '../js/geo.js';
 
@@ -64,6 +65,20 @@ test('normalizeWaypointKinds keeps dragged shaping points hidden', () => {
     ),
     ['endpoint', 'shape', 'via', 'endpoint'],
   );
+});
+
+test('replaceShapePointInLeg removes stale hidden points only from the dragged leg', () => {
+  const result = replaceShapePointInLeg(
+    [routePoints[0], routePoints[3], routePoints[6], routePoints[10],
+      routePoints[15], routePoints[20]],
+    ['endpoint', 'shape', 'shape', 'via', 'shape', 'endpoint'],
+    routePoints,
+    routePoints[7],
+  );
+  assert.deepEqual(result.waypoints,
+    [routePoints[0], routePoints[7], routePoints[10], routePoints[15], routePoints[20]]);
+  assert.deepEqual(result.kinds, ['endpoint', 'shape', 'via', 'shape', 'endpoint']);
+  assert.equal(result.index, 1);
 });
 
 test('moveEndpoint shortens the route and drops shaping points past the new end', () => {

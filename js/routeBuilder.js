@@ -9,7 +9,7 @@ import { saveRoute, getRoute, newId } from './store.js';
 import { addBaseMap } from './baseMap.js';
 import { reversePlace, searchPlace, searchPlaces } from './geocode.js';
 import { acceptedRecordingPoint } from './gpsRouteRecorder.js';
-import { waypointBearings } from './routeRouting.js';
+import { shortestRoute, waypointBearings } from './routeRouting.js';
 import { initSortableList } from './sortableList.js';
 import { translate as t } from './i18n.js';
 
@@ -737,7 +737,7 @@ function clearLights() {
 
 // Rebuild route.points from waypoints (OSRM snap or straight lines), then
 // re-space sector boundaries proportionally and redraw.
-async function requestRouteGeometry(wps, waypointKinds, signal = null) {
+async function requestRouteGeometry(wps, waypointKinds, signal = null, preferShortest = false) {
   const coords = wps.map(p => `${p[1]},${p[0]}`).join(';');
   const baseUrl = `${OSRM}${coords}?overview=full&geometries=geojson`;
   const bearings = waypointBearings(wps, 90, waypointKinds);
@@ -745,20 +745,24 @@ async function requestRouteGeometry(wps, waypointKinds, signal = null) {
   const requestSignal = signal && AbortSignal.any
     ? AbortSignal.any([signal, timeout])
     : signal ?? timeout;
-  let res = await fetch(`${baseUrl}&bearings=${encodeURIComponent(bearings)}`,
-    { signal: requestSignal });
+  const preferredUrl = preferShortest
+    ? `${baseUrl}&alternatives=3&continue_straight=false`
+    : `${baseUrl}&bearings=${encodeURIComponent(bearings)}`;
+  let res = await fetch(preferredUrl, { signal: requestSignal });
   let data = await res.json();
   if (data.code !== 'Ok') {
     res = await fetch(baseUrl, { signal: requestSignal });
     data = await res.json();
   }
-  if (data.code !== 'Ok' || !data.routes?.[0]) return null;
-  return data.routes[0].geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+  if (data.code !== 'Ok') return null;
+  const selected = preferShortest ? shortestRoute(data.routes) : data.routes?.[0];
+  if (!selected) return null;
+  return selected.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
 }
 
 async function previewRouteGeometry(wps, waypointKinds, signal) {
   if (!document.getElementById('snap-toggle').checked || wps.length < 2) return [...wps];
-  const points = await requestRouteGeometry(wps, waypointKinds, signal);
+  const points = await requestRouteGeometry(wps, waypointKinds, signal, true);
   if (!points) throw new Error('No preview route');
   return points;
 }

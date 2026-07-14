@@ -87,6 +87,34 @@ export function findInsertIndex(waypoints, routePoints, grabPoint) {
   return wpProgress.length;
 }
 
+// A shaping point is invisible, so users cannot remove stale ones themselves.
+// Keep only the latest drag between the same two visible waypoints; otherwise
+// repeated corrections silently turn every old drop into another mandatory
+// detour.
+export function replaceShapePointInLeg(waypoints, kinds, routePoints, grabPoint) {
+  const normalizedKinds = normalizeWaypointKinds(waypoints, kinds);
+  const insertIndex = Math.min(
+    Math.max(1, findInsertIndex(waypoints, routePoints, grabPoint)),
+    waypoints.length - 1,
+  );
+  let legStart = insertIndex - 1;
+  let legEnd = insertIndex;
+  while (legStart > 0 && normalizedKinds[legStart] === 'shape') legStart -= 1;
+  while (legEnd < waypoints.length - 1 && normalizedKinds[legEnd] === 'shape') legEnd += 1;
+
+  const nextWaypoints = [];
+  const nextKinds = [];
+  waypoints.forEach((waypoint, index) => {
+    if (index > legStart && index < legEnd && normalizedKinds[index] === 'shape') return;
+    nextWaypoints.push([...waypoint]);
+    nextKinds.push(normalizedKinds[index]);
+  });
+  const nextIndex = legStart + 1;
+  nextWaypoints.splice(nextIndex, 0, [...grabPoint]);
+  nextKinds.splice(nextIndex, 0, 'shape');
+  return { waypoints: nextWaypoints, kinds: nextKinds, index: nextIndex };
+}
+
 export function buildDragGuide(routePoints, grabProjection, target) {
   if (!grabProjection || routePoints.length < 2) return routePoints;
   const cum = cumulativeDistances(routePoints);
@@ -129,7 +157,7 @@ function onGrab(e) {
   if (!route || route.points.length < 2) return;
   const start = e.latlng;
   const grab = [start.lat, start.lng];
-  const idx = findInsertIndex(route.waypoints, route.points, grab);
+  let idx = findInsertIndex(route.waypoints, route.points, grab);
   const projection = projectOnRoute(grab, route.points, cumulativeDistances(route.points));
   let dragging = false;
   let previewTimer = null;
@@ -196,9 +224,11 @@ function onGrab(e) {
         .distanceTo(map.latLngToContainerPoint(start));
       if (movedPx < DRAG_THRESHOLD_PX) return;
       dragging = true;
-      route.waypointKinds = normalizeWaypointKinds(route.waypoints, route.waypointKinds);
-      route.waypoints.splice(idx, 0, grab);
-      route.waypointKinds.splice(idx, 0, 'shape');
+      const edit = replaceShapePointInLeg(
+        route.waypoints, route.waypointKinds, route.points, grab);
+      route.waypoints = edit.waypoints;
+      route.waypointKinds = edit.kinds;
+      idx = edit.index;
       preview = L.polyline(route.points, {
         color: '#8de9b4', weight: 7, opacity: 0.38, dashArray: '8 8', interactive: false,
         className: 'route-drag-preview route-drag-preview-stale',
