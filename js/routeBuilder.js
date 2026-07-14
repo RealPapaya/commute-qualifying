@@ -125,6 +125,7 @@ export function openRoute(existing, { creationMode = 'plan', name = '' } = {}) {
   route.waypointKinds = normalizeWaypointKinds(route.waypoints, route.waypointKinds);
   lastRecordingPoint = route.recorded ? route.points.at(-1) ?? null : null;
   resetPlaceInputs();
+  seedEndpointInputsFromRoute();
   const snapToggle = document.getElementById('snap-toggle');
   snapToggle.checked = route.snap !== false;
   document.getElementById('closed-loop-toggle').checked = route.closedLoop === true;
@@ -241,6 +242,44 @@ function resetPlaceInputs() {
   const buildButton = document.getElementById('btn-build-place-route');
   if (buildButton) buildButton.disabled = false;
   updatePlaceControls();
+}
+
+function coordLabel(point) {
+  return `${point[0].toFixed(5)}, ${point[1].toFixed(5)}`;
+}
+
+// Seed the start/end address inputs from an existing route's endpoint
+// waypoints, so re-editing shows them — especially a GPS-recorded route, which
+// has no typed address to fall back on. A coordinate label goes in synchronously
+// (never blank), then reverse geocoding upgrades it to a readable place name.
+function seedEndpointInputsFromRoute() {
+  if (recordingMode || !route.waypoints?.length) return;
+  const seeds = [[document.getElementById('place-start'), route.waypoints[0]]];
+  if (route.waypoints.length > 1) {
+    seeds.push([document.getElementById('place-end'), route.waypoints.at(-1)]);
+  }
+  for (const [input, point] of seeds) {
+    const place = { name: coordLabel(point), point };
+    selectedPlaces.set(input, place);
+    input.value = place.name;
+    resolveEndpointLabel(input, point);
+  }
+  pendingPlaceInput = null;
+  updatePlaceControls();
+}
+
+async function resolveEndpointLabel(input, point) {
+  const seq = (placeMoveSeq.get(input) ?? 0) + 1;
+  placeMoveSeq.set(input, seq);
+  try {
+    const place = await reversePlace(point);
+    if (placeMoveSeq.get(input) !== seq) return; // superseded by a later edit/drag
+    const labelled = { ...place, point };
+    selectedPlaces.set(input, labelled);
+    input.value = placeLabel(labelled);
+  } catch {
+    // Keep the coordinate label when reverse lookup is unavailable (offline).
+  }
 }
 
 function updatePlaceControls() {
