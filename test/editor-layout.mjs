@@ -63,7 +63,7 @@ const layout = await page.evaluate(() => {
     buildButtonExists: Boolean(document.getElementById('btn-build-place-route')),
     buttonTops: buttons.map(button => button.getBoundingClientRect().top),
     buttonOrder: [...document.querySelector('.editor-route-actions').children].map(button => button.id),
-    removedButtonsExist: Boolean(document.getElementById('btn-undo-wp') || document.getElementById('btn-clear-route')),
+    advancedActionIds: [...document.querySelectorAll('.editor-settings-actions .btn')].map(button => button.id),
     actionsAreLast: document.querySelector('.editor-panel').lastElementChild?.classList.contains('editor-route-actions'),
     advancedHidden: document.getElementById('editor-advanced').hidden,
     endpointLayout: { startBox, endBox, addBox },
@@ -78,7 +78,9 @@ if (Math.max(...layout.buttonTops) - Math.min(...layout.buttonTops) > 1) {
 if (layout.buttonOrder.join(',') !== 'btn-editor-advanced,btn-track-diagram,btn-save-route') {
   throw new Error(`unexpected editor action order: ${layout.buttonOrder.join(',')}`);
 }
-if (layout.removedButtonsExist) throw new Error('undo or clear is still present');
+if (layout.advancedActionIds.join(',') !== 'btn-undo-wp,btn-delete-route,btn-switch-recording') {
+  throw new Error(`unexpected advanced actions: ${layout.advancedActionIds.join(',')}`);
+}
 if (!layout.actionsAreLast) throw new Error('the three editor actions are not the bottom row');
 if (!layout.advancedHidden) throw new Error('advanced panel should start collapsed');
 const { startBox, endBox, addBox } = layout.endpointLayout;
@@ -95,7 +97,10 @@ const advancedStructure = await page.evaluate(() => ({
   headings: [...document.querySelectorAll('#editor-advanced h3')].map(heading => heading.id),
   infoContainsStats: document.querySelector('[aria-labelledby="track-info-title"] #route-stats') !== null,
   settingsContainControls: document.querySelector('[aria-labelledby="editor-settings-title"] #snap-toggle') !== null &&
-    document.querySelector('[aria-labelledby="editor-settings-title"] #closed-loop-toggle') !== null,
+    document.querySelector('[aria-labelledby="editor-settings-title"] #closed-loop-toggle') !== null &&
+    document.querySelector('[aria-labelledby="editor-settings-title"] #btn-undo-wp') !== null &&
+    document.querySelector('[aria-labelledby="editor-settings-title"] #btn-delete-route') !== null &&
+    document.querySelector('[aria-labelledby="editor-settings-title"] #btn-switch-recording') !== null,
 }));
 if (advancedStructure.headings.join(',') !== 'track-info-title,editor-settings-title' ||
     !advancedStructure.infoContainsStats || !advancedStructure.settingsContainControls) {

@@ -91,14 +91,40 @@ await page.click('#btn-record-checkpoint');
 await page.click('#btn-record-light');
 await page.evaluate(() => window.__emitRecordedFix(25.0012, 121.5000));
 await page.click('#btn-stop-gps-recording');
+if (!await page.locator('#place-route-form').isVisible() ||
+    await page.locator('#gps-recording-panel').isVisible()) {
+  throw new Error('stopping GPS recording did not return to the standard route editor');
+}
+await page.click('#btn-editor-advanced');
+await page.click('#btn-undo-wp');
 await page.click('#btn-save-route');
 
 const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('commute-qualifying-v1')).routes[0]);
-if (saved.name !== 'GPS smoke route' || !saved.recorded || saved.snap !== false || saved.points.length !== 3 || saved.waypoints.length !== 3) {
+if (saved.name !== 'GPS smoke route' || !saved.recorded || saved.snap !== false || saved.points.length !== 2 || saved.waypoints.length !== 2) {
   throw new Error(`unexpected recorded route: ${JSON.stringify(saved)}`);
 }
 if (saved.sectorBoundaries.length !== 1 || saved.lights.length !== 1) {
   throw new Error(`recorded markers missing: ${JSON.stringify(saved)}`);
+}
+await page.click('[data-edit]');
+if (!await page.locator('#place-route-form').isVisible() ||
+    await page.locator('#gps-recording-panel').isVisible()) {
+  throw new Error('reopening a recorded route did not use the standard route editor');
+}
+await page.click('#btn-editor-advanced');
+await page.click('#btn-switch-recording');
+if (!await page.locator('#gps-recording-panel').isVisible() ||
+    await page.locator('#place-route-form').isVisible()) {
+  throw new Error('switch-to-recording did not enter GPS recording mode');
+}
+page.once('dialog', dialog => dialog.accept());
+await page.click('#btn-delete-route');
+const afterDelete = await page.evaluate(() => ({
+  routes: JSON.parse(localStorage.getItem('commute-qualifying-v1')).routes.length,
+  routesView: document.getElementById('view-routes').classList.contains('active'),
+}));
+if (afterDelete.routes !== 0 || !afterDelete.routesView) {
+  throw new Error(`editor delete did not remove the route: ${JSON.stringify(afterDelete)}`);
 }
 await page.click('#btn-new-route');
 await page.fill('#new-route-name', 'Planning route');

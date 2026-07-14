@@ -11,12 +11,13 @@ import { reversePlace, searchPlace, searchPlaces } from './geocode.js';
 import { acceptedRecordingPoint } from './gpsRouteRecorder.js';
 import { waypointBearings } from './routeRouting.js';
 import { initSortableList } from './sortableList.js';
+import { translate as t } from './i18n.js';
 
 const OSRM = 'https://router.project-osrm.org/route/v1/driving/';
 
 let map, route, activeTool = 'trace';
 let routeLine, routeLineCasing, wpMarkers = [], lightMarkers = [], placeMarkers = [];
-let onSaved = null;
+let onSaved = null, onDeleted = null;
 let buildSeq = 0; // stale-response guard for async OSRM rebuilds
 let afterRebuildHandlers = []; // hooks run once the polyline/markers are freshly redrawn
 let placeSearchSeq = 0;
@@ -38,6 +39,7 @@ const TOOL_HELP = {
 
 export function initEditor(callbacks) {
   onSaved = callbacks.onSaved;
+  onDeleted = callbacks.onDeleted;
   map = L.map('editor-map', { zoomControl: false }).setView([25.04, 121.53], 13);
   window._editorMap = map; // test hook (e2e driver)
   addBaseMap(map);
@@ -51,6 +53,9 @@ export function initEditor(callbacks) {
   document.getElementById('btn-clear-lights').addEventListener('click', clearLights);
   document.getElementById('btn-save-route').addEventListener('click', persist);
   document.getElementById('btn-editor-advanced').addEventListener('click', toggleAdvanced);
+  document.getElementById('btn-undo-wp').addEventListener('click', undoWaypoint);
+  document.getElementById('btn-delete-route').addEventListener('click', deleteCurrentRoute);
+  document.getElementById('btn-switch-recording').addEventListener('click', switchToRecordingMode);
   document.getElementById('btn-add-sector').addEventListener('click', () => changeSectorCount(+1));
   document.getElementById('btn-remove-sector').addEventListener('click', () => changeSectorCount(-1));
   document.getElementById('btn-track-diagram').addEventListener('click', toggleTrackDiagram);
@@ -94,7 +99,7 @@ export function openRoute(existing, { creationMode = 'plan', name = '' } = {}) {
   stopGpsRecording({ quiet: true });
   placeSearchSeq += 1;
   pendingPlaceInput = null;
-  recordingMode = creationMode === 'record' || existing?.recorded === true;
+  recordingMode = !existing && creationMode === 'record';
   route = existing ?? {
     id: newId(),
     name,
@@ -113,6 +118,8 @@ export function openRoute(existing, { creationMode = 'plan', name = '' } = {}) {
   snapToggle.checked = route.snap !== false;
   document.getElementById('closed-loop-toggle').checked = route.closedLoop === true;
   snapToggle.disabled = recordingMode;
+  document.getElementById('editor-advanced').hidden = true;
+  document.getElementById('btn-editor-advanced').setAttribute('aria-expanded', 'false');
   document.getElementById('gps-recording-panel').hidden = !recordingMode;
   document.getElementById('place-route-form').hidden = recordingMode;
   setRecordingStatus(recordingMode ? 'Ready to record.' : '');
@@ -516,6 +523,7 @@ function updateRecordingControls() {
   const canMark = recording && lastRecordingPoint !== null;
   document.getElementById('btn-record-checkpoint').disabled = !canMark;
   document.getElementById('btn-record-light').disabled = !canMark;
+  document.getElementById('btn-switch-recording').disabled = recordingMode;
 }
 
 // Start the GPS watch directly in the button handler. iOS Safari requires the
@@ -582,8 +590,23 @@ function stopGpsRecording({ quiet = false } = {}) {
   if (wasRecording && route) redrawAll();
   if (!quiet && recordingMode) {
     setRecordingStatus(`Recording stopped — ${route?.points.length ?? 0} GPS points captured.`);
+    recordingMode = false;
+    document.getElementById('snap-toggle').disabled = false;
+    updateToolActions(activeTool);
+    redrawAll();
   }
   if (document.getElementById('btn-start-gps-recording')) updateRecordingControls();
+}
+
+function switchToRecordingMode() {
+  if (recordingMode) return;
+  recordingMode = true;
+  lastRecordingPoint = route.points.at(-1) ?? null;
+  document.getElementById('snap-toggle').disabled = true;
+  setRecordingStatus(route.points.length ? 'Ready to resume recording.' : 'Ready to record.');
+  updateRecordingControls();
+  setTool('trace');
+  redrawAll();
 }
 
 function addRecordedCheckpoint() {
@@ -675,6 +698,20 @@ function toggleAdvanced() {
   const button = document.getElementById('btn-editor-advanced');
   panel.hidden = !panel.hidden;
   button.setAttribute('aria-expanded', String(!panel.hidden));
+}
+
+function undoWaypoint() {
+  if (!route?.waypoints.length) return;
+  if (route.waypoints.length > 2) route.waypoints.splice(route.waypoints.length - 2, 1);
+  else route.waypoints.pop();
+  lastRecordingPoint = route.waypoints.at(-1) ?? null;
+  rebuildGeometry();
+}
+
+function deleteCurrentRoute() {
+  if (!confirm(t('deleteRouteConfirm'))) return;
+  stopGpsRecording({ quiet: true });
+  onDeleted?.(route);
 }
 
 function clearLights() {
@@ -778,7 +815,7 @@ function redrawLine() {
 
 function redrawWaypoints() {
   wpMarkers.forEach(m => m.remove());
-  if (route.recorded) {
+  if (recordingMode) {
     wpMarkers = [];
     return;
   }

@@ -287,6 +287,13 @@ initEditor({
     enableTabs(true, true);
     showView('routes');
   },
+  onDeleted(route) {
+    if (getRoute(route.id)) deleteRoute(route.id);
+    activeRouteId = null;
+    editorLoadedId = null;
+    enableTabs(false, false);
+    showView('routes');
+  },
 });
 initRun({
   onRunSaved(record) {
