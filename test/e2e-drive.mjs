@@ -128,30 +128,45 @@ if (await page.locator('.light-icon').count()) {
 }
 
 // ---- 1b. Feature A: drag the middle of the route path itself (not a
-// waypoint marker) — should splice in a new via waypoint and reroute ----
+// waypoint marker) — should reshape the route without leaving a marker ----
 const wpCountBeforePathDrag = await page.locator('.wp-marker').count();
 const statsBeforePathDrag = await stats();
+const pathBeforePathDrag = await page.locator('.route-line-editor').getAttribute('d');
 const pathMid = await page.evaluate(() => {
   const map = window._editorMap;
   let line = null;
-  map.eachLayer(l => { if (l instanceof L.Polyline) line = l; });
-  const latlngs = line.getLatLngs();
-  const mid = latlngs[Math.floor(latlngs.length / 2)];
-  return map.latLngToContainerPoint(mid);
+  map.eachLayer(l => {
+    if (l instanceof L.Polyline && l.options.className === 'route-line-hit') line = l;
+  });
+  const center = map.getSize().divideBy(2);
+  const rect = map.getContainer().getBoundingClientRect();
+  const candidates = line.getLatLngs().map(latlng => map.latLngToContainerPoint(latlng))
+    .filter(point => point.x > 20 && point.y > 20 &&
+      point.x < rect.width - 20 && point.y < rect.height - 20)
+    .sort((a, b) => a.distanceTo(center) - b.distanceTo(center));
+  return candidates.find(point =>
+    document.elementFromPoint(rect.left + point.x, rect.top + point.y)
+      ?.classList.contains('route-line-hit')) ?? candidates[0];
 });
 const editorBox = await page.locator('#editor-map').boundingBox();
+const dragX = pathMid.x < editorBox.width / 2 ? pathMid.x + 120 : pathMid.x - 120;
+const dragY = pathMid.y < editorBox.height / 2 ? pathMid.y + 80 : pathMid.y - 80;
 await page.mouse.move(editorBox.x + pathMid.x, editorBox.y + pathMid.y);
 await page.mouse.down();
-await page.mouse.move(editorBox.x + pathMid.x + 35, editorBox.y + pathMid.y - 25, { steps: 12 });
+await page.mouse.move(editorBox.x + dragX, editorBox.y + dragY, { steps: 12 });
+await page.waitForSelector('.route-drag-preview', { state: 'attached' });
 await page.mouse.up();
-await page.waitForFunction(n =>
-  document.querySelectorAll('.wp-marker').length === n, wpCountBeforePathDrag + 1,
+await page.waitForFunction(prev =>
+  document.querySelector('.route-line-editor')?.getAttribute('d') !== prev, pathBeforePathDrag,
   { timeout: 20000 });
 const statsAfterPathDrag = await stats();
 console.log('path-drag waypoints:', wpCountBeforePathDrag, '->',
   await page.locator('.wp-marker').count(), '| stats:', statsBeforePathDrag, '->', statsAfterPathDrag);
-if (statsAfterPathDrag === statsBeforePathDrag) {
-  throw new Error('path drag did not change route geometry');
+if (await page.locator('.wp-marker').count() !== wpCountBeforePathDrag) {
+  throw new Error('path drag left a visible waypoint marker behind');
+}
+if (await page.locator('.route-drag-preview').count()) {
+  throw new Error('path drag preview was not removed after dropping the route');
 }
 await shot('1b-path-dragged');
 
@@ -172,7 +187,15 @@ await shot('2-waypoint-dragged');
 // ---- 3. traffic lights near two intersections along the route ----
 await page.click('[data-tool="light"]');
 await clickMap([25.5, 121.9]); // off-route: rejected
-await clickMap(WP1); // on-route: accepted and snapped to the route
+await page.evaluate(() => {
+  const map = window._editorMap;
+  let line = null;
+  map.eachLayer(layer => {
+    if (layer instanceof L.Polyline && layer.options.className === 'route-line-hit') line = layer;
+  });
+  const points = line.getLatLngs();
+  map.fire('click', { latlng: points[Math.floor(points.length / 4)] });
+}); // on-route: accepted and snapped to the route
 if (await page.locator('.light-icon').count() !== 1) {
   throw new Error('manual traffic-light route filtering failed');
 }

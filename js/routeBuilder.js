@@ -2,7 +2,7 @@
 // lines), mark traffic lights (with Street View link-out), edit sectors.
 import { cumulativeDistances, projectOnRoute } from './geo.js';
 import { initSectorTool, renderSectorHandles, defaultBoundaries } from './sectors.js';
-import { initRouteDrag } from './routeDrag.js';
+import { initRouteDrag, moveEndpoint, normalizeWaypointKinds } from './routeDrag.js';
 import { renderTrackDiagram } from './trackDiagram.js';
 import { resetTrackDiagramView } from './trackDiagramInteraction.js';
 import { saveRoute, getRoute, newId } from './store.js';
@@ -16,7 +16,7 @@ import { translate as t } from './i18n.js';
 const OSRM = 'https://router.project-osrm.org/route/v1/driving/';
 
 let map, route, activeTool = 'trace';
-let routeLine, routeLineCasing, wpMarkers = [], lightMarkers = [], placeMarkers = [];
+let routeLine, routeLineCasing, routeLineHit, wpMarkers = [], lightMarkers = [], placeMarkers = [];
 let onSaved = null, onDeleted = null;
 let buildSeq = 0; // stale-response guard for async OSRM rebuilds
 let afterRebuildHandlers = []; // hooks run once the polyline/markers are freshly redrawn
@@ -32,7 +32,7 @@ const MIN_RECORDED_CHECKPOINT_M = 50;
 const MAX_LIGHT_ROUTE_DISTANCE_M = 30;
 
 const TOOL_HELP = {
-  trace: '',
+  trace: '拖曳綠色路線可調整路徑；拖曳起點或終點可縮短、延長。',
   light: 'Click on the map to mark a traffic light. Click a light for Street View / delete.',
   sector: 'Drag the yellow handles along the route to move sector boundaries. Use +/− Sector to add or remove.',
 };
@@ -83,7 +83,7 @@ export function initEditor(callbacks) {
   initRouteDrag({
     map,
     getRoute: () => route,
-    getPolyline: () => routeLine,
+    getPolyline: () => routeLineHit,
     rebuild: rebuildGeometry,
     onAfterRebuild,
   });
@@ -112,6 +112,7 @@ export function openRoute(existing, { creationMode = 'plan', name = '' } = {}) {
     closedLoop: false,
   };
   if (recordingMode && !existing) route.snap = false;
+  route.waypointKinds = normalizeWaypointKinds(route.waypoints, route.waypointKinds);
   lastRecordingPoint = route.recorded ? route.points.at(-1) ?? null : null;
   resetPlaceInputs();
   const snapToggle = document.getElementById('snap-toggle');
@@ -453,6 +454,7 @@ function rebuildRouteFromSelectedPlaces() {
     ...viaInputs().map(via => selectedPlaces.get(via)?.point).filter(Boolean),
     end.point,
   ];
+  route.waypointKinds = normalizeWaypointKinds(route.waypoints);
   route.recorded = false;
   clearPlacePins();
   rebuildGeometry();
@@ -492,6 +494,7 @@ async function buildRouteFromPlaces() {
     if (seq !== placeSearchSeq) return;
 
     route.waypoints = resolved.map(place => place.point);
+    route.waypointKinds = normalizeWaypointKinds(route.waypoints);
     pendingPlaceInput = null;
     clearPlacePins();
     await rebuildGeometry();
@@ -556,6 +559,7 @@ function handleRecordingFix(position) {
   }
 
   route.waypoints.push(point);
+  route.waypointKinds = normalizeWaypointKinds(route.waypoints, route.waypointKinds);
   route.points.push(point);
   lastRecordingPoint = point;
   if (!recordingMarker) {
@@ -642,6 +646,7 @@ function setTool(tool) {
   activeTool = TOOL_HELP[tool] ? tool : 'trace';
   document.querySelectorAll('#editor-toolbar .tool').forEach(b =>
     b.classList.toggle('active', b.dataset.tool === activeTool));
+  setRouteLineEditing(activeTool === 'trace');
   document.getElementById('tool-help').textContent = TOOL_HELP[activeTool];
   renderSectorHandles(activeTool === 'sector');
   updateToolActions(activeTool);
@@ -702,8 +707,14 @@ function toggleAdvanced() {
 
 function undoWaypoint() {
   if (!route?.waypoints.length) return;
-  if (route.waypoints.length > 2) route.waypoints.splice(route.waypoints.length - 2, 1);
-  else route.waypoints.pop();
+  if (route.waypoints.length > 2) {
+    route.waypoints.splice(route.waypoints.length - 2, 1);
+    route.waypointKinds.splice(route.waypointKinds.length - 2, 1);
+  } else {
+    route.waypoints.pop();
+    route.waypointKinds.pop();
+  }
+  route.waypointKinds = normalizeWaypointKinds(route.waypoints, route.waypointKinds);
   lastRecordingPoint = route.waypoints.at(-1) ?? null;
   rebuildGeometry();
 }
@@ -799,8 +810,10 @@ function redrawAll({ notifyAfterRebuild = true } = {}) {
 function redrawLine() {
   if (routeLineCasing) routeLineCasing.remove();
   if (routeLine) routeLine.remove();
+  if (routeLineHit) routeLineHit.remove();
   routeLineCasing = null;
   routeLine = null;
+  routeLineHit = null;
   if (route.points.length > 1) {
     routeLineCasing = L.polyline(route.points, {
       color: '#dce6de', weight: 11, opacity: 0.9, interactive: false,
@@ -808,9 +821,18 @@ function redrawLine() {
     }).addTo(map);
     routeLine = L.polyline(route.points, {
       color: '#237443', weight: 8, opacity: 1,
-      className: 'route-line-core route-line-editor',
+      interactive: false, className: 'route-line-core route-line-editor',
     }).addTo(map);
+    routeLineHit = L.polyline(route.points, {
+      color: '#237443', weight: 28, opacity: 0.01,
+      className: 'route-line-hit',
+    }).addTo(map);
+    setRouteLineEditing(activeTool === 'trace');
   }
+}
+
+function setRouteLineEditing(enabled) {
+  routeLineHit?.getElement?.()?.classList.toggle('leaflet-interactive', enabled);
 }
 
 function redrawWaypoints() {
@@ -820,6 +842,7 @@ function redrawWaypoints() {
     return;
   }
   wpMarkers = route.waypoints.map((p, i) => {
+    if (route.waypointKinds?.[i] === 'shape') return null;
     const role = i === 0 ? 'start' : i === route.waypoints.length - 1 ? 'end' : 'via';
     const label = role === 'start' ? '起點' : role === 'end' ? '終點' : `必經點 ${i}`;
     const m = L.marker(p, {
@@ -830,10 +853,17 @@ function redrawWaypoints() {
     }).addTo(map);
     m.on('dragend', () => {
       const point = [m.getLatLng().lat, m.getLatLng().lng];
-      route.waypoints[i] = point;
-      const input = i === 0
+      if (role === 'start' || role === 'end') {
+        const moved = moveEndpoint(
+          route.waypoints, route.points, route.waypointKinds, role, point);
+        route.waypoints = moved.waypoints;
+        route.waypointKinds = moved.kinds;
+      } else {
+        route.waypoints[i] = point;
+      }
+      const input = role === 'start'
         ? document.getElementById('place-start')
-        : i === route.waypoints.length - 1
+        : role === 'end'
           ? document.getElementById('place-end')
           : viaInputs()[i - 1];
       const selected = input && selectedPlaces.get(input);
@@ -843,10 +873,12 @@ function redrawWaypoints() {
     });
     m.on('dblclick', () => {
       route.waypoints.splice(i, 1);
+      route.waypointKinds.splice(i, 1);
+      route.waypointKinds = normalizeWaypointKinds(route.waypoints, route.waypointKinds);
       rebuildGeometry();
     });
     return m;
-  });
+  }).filter(Boolean);
 }
 
 function redrawLights() {

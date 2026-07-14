@@ -1,10 +1,70 @@
-// Drag-to-reroute: grab any point on the route's polyline and drag it to
-// insert a new via waypoint there, bending the route (like dragging a route
-// line in Google Maps). Reuses the pure projection helpers in geo.js to work
-// out which two waypoints the grabbed point falls between.
+// Drag-to-reroute: grab any point on the route's polyline and drag it to add
+// an invisible shaping point, bending the route without leaving another map
+// marker behind. Reuses the pure projection helpers in geo.js to work out
+// which two waypoints the grabbed point falls between.
 import { cumulativeDistances, projectOnRoute } from './geo.js';
 
 const DRAG_THRESHOLD_PX = 5; // ignore sub-pixel jitter so a plain click still behaves as a click
+const ENDPOINT_SNAP_M = 60;
+const ENDPOINT_TRIM_M = 15;
+
+export function normalizeWaypointKinds(waypoints, kinds = []) {
+  return waypoints.map((_, index) => {
+    if (index === 0 || index === waypoints.length - 1) return 'endpoint';
+    return kinds[index] === 'shape' ? 'shape' : 'via';
+  });
+}
+
+// Pure: move an endpoint. When it is pulled back onto the existing route,
+// discard waypoints beyond the drop position so the route becomes shorter
+// instead of doubling back. An off-route drop is a normal extension/reroute.
+export function moveEndpoint(waypoints, routePoints, kinds, endpoint, point) {
+  const nextWaypoints = waypoints.map(p => [...p]);
+  const nextKinds = normalizeWaypointKinds(nextWaypoints, kinds);
+  const index = endpoint === 'start' ? 0 : nextWaypoints.length - 1;
+  if (nextWaypoints.length < 2 || routePoints.length < 2) {
+    nextWaypoints[index] = point;
+    return { waypoints: nextWaypoints, kinds: nextKinds, trimmed: false };
+  }
+
+  const cum = cumulativeDistances(routePoints);
+  const projection = projectOnRoute(point, routePoints, cum);
+  const total = cum.at(-1);
+  const trimsStart = endpoint === 'start' && projection?.offRoute <= ENDPOINT_SNAP_M &&
+    projection.progress > ENDPOINT_TRIM_M;
+  const trimsEnd = endpoint === 'end' && projection?.offRoute <= ENDPOINT_SNAP_M &&
+    projection.progress < total - ENDPOINT_TRIM_M;
+  if (!trimsStart && !trimsEnd) {
+    nextWaypoints[index] = point;
+    return { waypoints: nextWaypoints, kinds: nextKinds, trimmed: false };
+  }
+
+  const projected = nextWaypoints.map(waypoint =>
+    projectOnRoute(waypoint, routePoints, cum)?.progress ?? 0);
+  const keptWaypoints = [];
+  const keptKinds = [];
+  for (let i = 0; i < nextWaypoints.length; i++) {
+    const keep = trimsStart
+      ? i === nextWaypoints.length - 1 || (i > 0 && projected[i] > projection.progress)
+      : i === 0 || (i < nextWaypoints.length - 1 && projected[i] < projection.progress);
+    if (keep) {
+      keptWaypoints.push(nextWaypoints[i]);
+      keptKinds.push(nextKinds[i]);
+    }
+  }
+  if (trimsStart) {
+    keptWaypoints.unshift(projection.point);
+    keptKinds.unshift('endpoint');
+  } else {
+    keptWaypoints.push(projection.point);
+    keptKinds.push('endpoint');
+  }
+  return {
+    waypoints: keptWaypoints,
+    kinds: normalizeWaypointKinds(keptWaypoints, keptKinds),
+    trimmed: true,
+  };
+}
 
 // Pure: index at which to splice a new waypoint (grabPoint) into `waypoints`,
 // given the route's current polyline geometry (`routePoints`, i.e.
@@ -27,7 +87,7 @@ export function findInsertIndex(waypoints, routePoints, grabPoint) {
 }
 
 let map, getRoute, getPolyline, rebuild;
-let ghost = null;
+let preview = null;
 
 // { map, getRoute, getPolyline, rebuild, onAfterRebuild }
 export function initRouteDrag(opts) {
@@ -48,6 +108,7 @@ function onGrab(e) {
   const start = e.latlng;
   const grab = [start.lat, start.lng];
   const idx = findInsertIndex(route.waypoints, route.points, grab);
+  const projection = projectOnRoute(grab, route.points, cumulativeDistances(route.points));
   let dragging = false;
 
   map.dragging.disable();
@@ -58,12 +119,20 @@ function onGrab(e) {
         .distanceTo(map.latLngToContainerPoint(start));
       if (movedPx < DRAG_THRESHOLD_PX) return;
       dragging = true;
+      route.waypointKinds = normalizeWaypointKinds(route.waypoints, route.waypointKinds);
       route.waypoints.splice(idx, 0, grab);
-      ghost = L.marker(grab, {
-        icon: L.divIcon({ className: 'wp-marker', iconSize: [12, 12] }),
+      route.waypointKinds.splice(idx, 0, 'shape');
+      preview = L.polyline(route.points, {
+        color: '#40d982', weight: 6, opacity: 0.9, dashArray: '8 8', interactive: false,
+        className: 'route-drag-preview',
       }).addTo(map);
     }
-    ghost.setLatLng(ev.latlng);
+    const split = projection?.segIndex ?? 0;
+    preview.setLatLngs([
+      ...route.points.slice(0, split + 1),
+      [ev.latlng.lat, ev.latlng.lng],
+      ...route.points.slice(split + 1),
+    ]);
   }
 
   function onUp(ev) {
@@ -73,8 +142,8 @@ function onGrab(e) {
     if (dragging) {
       swallowNextClick();
       route.waypoints[idx] = [ev.latlng.lat, ev.latlng.lng];
-      ghost.remove();
-      ghost = null;
+      preview.remove();
+      preview = null;
       rebuild();
     }
   }

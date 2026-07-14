@@ -1,6 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { findInsertIndex } from '../js/routeDrag.js';
+import {
+  findInsertIndex,
+  moveEndpoint,
+  normalizeWaypointKinds,
+} from '../js/routeDrag.js';
 import { pointAtDistance, cumulativeDistances } from '../js/geo.js';
 
 // ---- fixture: 2 km straight route heading north, one point every 100 m
@@ -37,4 +41,66 @@ test('findInsertIndex: off-route grab still projects to the nearest segment', ()
 
 test('findInsertIndex: fewer than 2 waypoints just appends', () => {
   assert.equal(findInsertIndex([routePoints[0]], routePoints, routePoints[5]), 1);
+});
+
+test('normalizeWaypointKinds keeps dragged shaping points hidden', () => {
+  assert.deepEqual(
+    normalizeWaypointKinds(
+      [routePoints[0], routePoints[5], routePoints[10], routePoints[20]],
+      ['endpoint', 'shape', 'via', 'endpoint'],
+    ),
+    ['endpoint', 'shape', 'via', 'endpoint'],
+  );
+});
+
+test('moveEndpoint shortens the route and drops shaping points past the new end', () => {
+  const result = moveEndpoint(
+    [routePoints[0], routePoints[10], routePoints[20]],
+    routePoints,
+    ['endpoint', 'shape', 'endpoint'],
+    'end',
+    routePoints[5],
+  );
+  assert.deepEqual(result.waypoints, [routePoints[0], routePoints[5]]);
+  assert.deepEqual(result.kinds, ['endpoint', 'endpoint']);
+  assert.equal(result.trimmed, true);
+});
+
+test('moveEndpoint keeps shaping points when the end is extended off-route', () => {
+  const extension = [25.03, 121.5];
+  const result = moveEndpoint(
+    [routePoints[0], routePoints[10], routePoints[20]],
+    routePoints,
+    ['endpoint', 'shape', 'endpoint'],
+    'end',
+    extension,
+  );
+  assert.deepEqual(result.waypoints, [routePoints[0], routePoints[10], extension]);
+  assert.deepEqual(result.kinds, ['endpoint', 'shape', 'endpoint']);
+  assert.equal(result.trimmed, false);
+});
+
+test('moveEndpoint can pull the start forward and remove earlier vias', () => {
+  const result = moveEndpoint(
+    [routePoints[0], routePoints[10], routePoints[20]],
+    routePoints,
+    ['endpoint', 'via', 'endpoint'],
+    'start',
+    routePoints[15],
+  );
+  assert.deepEqual(result.waypoints, [routePoints[15], routePoints[20]]);
+  assert.deepEqual(result.kinds, ['endpoint', 'endpoint']);
+  assert.equal(result.trimmed, true);
+});
+
+test('moveEndpoint keeps two matching endpoints when closing the route', () => {
+  const result = moveEndpoint(
+    [routePoints[0], routePoints[10], routePoints[20]],
+    routePoints,
+    ['endpoint', 'shape', 'endpoint'],
+    'end',
+    routePoints[0],
+  );
+  assert.deepEqual(result.waypoints, [routePoints[0], routePoints[0]]);
+  assert.deepEqual(result.kinds, ['endpoint', 'endpoint']);
 });
