@@ -85,6 +85,8 @@ export function initEditor(callbacks) {
     getRoute: () => route,
     getPolyline: () => routeLineHit,
     rebuild: rebuildGeometry,
+    previewRoute: previewRouteGeometry,
+    commitPreview: commitPreviewGeometry,
     onAfterRebuild,
   });
 }
@@ -735,6 +737,32 @@ function clearLights() {
 
 // Rebuild route.points from waypoints (OSRM snap or straight lines), then
 // re-space sector boundaries proportionally and redraw.
+async function requestRouteGeometry(wps, waypointKinds, signal = null) {
+  const coords = wps.map(p => `${p[1]},${p[0]}`).join(';');
+  const baseUrl = `${OSRM}${coords}?overview=full&geometries=geojson`;
+  const bearings = waypointBearings(wps, 90, waypointKinds);
+  const timeout = AbortSignal.timeout(6000);
+  const requestSignal = signal && AbortSignal.any
+    ? AbortSignal.any([signal, timeout])
+    : signal ?? timeout;
+  let res = await fetch(`${baseUrl}&bearings=${encodeURIComponent(bearings)}`,
+    { signal: requestSignal });
+  let data = await res.json();
+  if (data.code !== 'Ok') {
+    res = await fetch(baseUrl, { signal: requestSignal });
+    data = await res.json();
+  }
+  if (data.code !== 'Ok' || !data.routes?.[0]) return null;
+  return data.routes[0].geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+}
+
+async function previewRouteGeometry(wps, waypointKinds, signal) {
+  if (!document.getElementById('snap-toggle').checked || wps.length < 2) return [...wps];
+  const points = await requestRouteGeometry(wps, waypointKinds, signal);
+  if (!points) throw new Error('No preview route');
+  return points;
+}
+
 async function rebuildGeometry() {
   const seq = ++buildSeq;
   route.snap = document.getElementById('snap-toggle').checked;
@@ -743,27 +771,25 @@ async function rebuildGeometry() {
 
   if (route.snap && wps.length >= 2) {
     try {
-      const coords = wps.map(p => `${p[1]},${p[0]}`).join(';');
-      const baseUrl = `${OSRM}${coords}?overview=full&geometries=geojson`;
-      const bearings = waypointBearings(wps);
-      let res = await fetch(`${baseUrl}&bearings=${encodeURIComponent(bearings)}`,
-        { signal: AbortSignal.timeout(6000) });
-      let data = await res.json();
-      if (data.code !== 'Ok') {
-        res = await fetch(baseUrl, { signal: AbortSignal.timeout(6000) });
-        data = await res.json();
-      }
-      if (data.code === 'Ok' && data.routes?.[0]) {
-        points = data.routes[0].geometry.coordinates.map(([lng, lat]) => [lat, lng]);
-      } else {
-        flashHelp('Road snapping failed — using straight lines.');
-      }
+      const routed = await requestRouteGeometry(wps, route.waypointKinds);
+      if (routed) points = routed;
+      else flashHelp('Road snapping failed — using straight lines.');
     } catch {
       flashHelp('Road snapping unavailable — using straight lines.');
     }
   }
   if (seq !== buildSeq) return; // a newer rebuild superseded this one
 
+  applyGeometry(points);
+}
+
+function commitPreviewGeometry(points) {
+  buildSeq += 1;
+  route.snap = document.getElementById('snap-toggle').checked;
+  applyGeometry(points);
+}
+
+function applyGeometry(points) {
   const oldTotal = route.points.length > 1 ?
     cumulativeDistances(route.points).at(-1) : 0;
   route.points = points;

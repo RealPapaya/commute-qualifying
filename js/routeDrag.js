@@ -5,6 +5,7 @@
 import { cumulativeDistances, projectOnRoute } from './geo.js';
 
 const DRAG_THRESHOLD_PX = 5; // ignore sub-pixel jitter so a plain click still behaves as a click
+const PREVIEW_INTERVAL_MS = 180;
 const ENDPOINT_SNAP_M = 60;
 const ENDPOINT_TRIM_M = 15;
 
@@ -86,12 +87,33 @@ export function findInsertIndex(waypoints, routePoints, grabPoint) {
   return wpProgress.length;
 }
 
-let map, getRoute, getPolyline, rebuild;
-let preview = null;
+export function buildDragGuide(routePoints, grabProjection, target) {
+  if (!grabProjection || routePoints.length < 2) return routePoints;
+  const cum = cumulativeDistances(routePoints);
+  const total = cum.at(-1);
+  const influenceM = Math.min(800, Math.max(200, total * 0.15));
+  const delta = [
+    target[0] - grabProjection.point[0],
+    target[1] - grabProjection.point[1],
+  ];
+  const shifted = routePoints.map((point, index) => {
+    const distance = Math.abs(cum[index] - grabProjection.progress);
+    const weight = distance >= influenceM
+      ? 0
+      : (1 + Math.cos(Math.PI * distance / influenceM)) / 2;
+    return [point[0] + delta[0] * weight, point[1] + delta[1] * weight];
+  });
+  shifted.splice(grabProjection.segIndex + 1, 0, target);
+  return shifted;
+}
 
-// { map, getRoute, getPolyline, rebuild, onAfterRebuild }
+let map, getRoute, getPolyline, rebuild, previewRoute, commitPreview;
+let preview = null;
+let guide = null;
+
+// { map, getRoute, getPolyline, rebuild, previewRoute, commitPreview, onAfterRebuild }
 export function initRouteDrag(opts) {
-  ({ map, getRoute, getPolyline, rebuild } = opts);
+  ({ map, getRoute, getPolyline, rebuild, previewRoute, commitPreview } = opts);
   opts.onAfterRebuild(bindPolyline);
   bindPolyline();
 }
@@ -110,8 +132,63 @@ function onGrab(e) {
   const idx = findInsertIndex(route.waypoints, route.points, grab);
   const projection = projectOnRoute(grab, route.points, cumulativeDistances(route.points));
   let dragging = false;
+  let previewTimer = null;
+  let previewController = null;
+  let previewInFlight = false;
+  let previewDirty = false;
+  let lastPreviewStartedAt = 0;
+  let lastPreviewKey = null;
+  let lastPreviewPoints = null;
 
   map.dragging.disable();
+
+  function showDragGuide(point) {
+    guide.setLatLngs(buildDragGuide(route.points, projection, point));
+  }
+
+  function queueRoutedPreview() {
+    if (!previewRoute) return;
+    previewDirty = true;
+    if (previewInFlight || previewTimer) return;
+    const delay = Math.max(0,
+      PREVIEW_INTERVAL_MS - (Date.now() - lastPreviewStartedAt));
+    previewTimer = setTimeout(runRoutedPreview, delay);
+  }
+
+  async function runRoutedPreview() {
+    previewTimer = null;
+    if (!dragging || !previewDirty) return;
+    previewDirty = false;
+    previewInFlight = true;
+    lastPreviewStartedAt = Date.now();
+    previewController = new AbortController();
+    const waypoints = route.waypoints.map(point => [...point]);
+    const kinds = [...route.waypointKinds];
+    const key = JSON.stringify(waypoints);
+    try {
+      const points = await previewRoute(waypoints, kinds, previewController.signal);
+      if (!dragging || !preview) return;
+      lastPreviewKey = key;
+      lastPreviewPoints = points;
+      preview.setLatLngs(points);
+      preview.setStyle({ opacity: 0.62, dashArray: null });
+      if (key === JSON.stringify(route.waypoints)) {
+        preview.getElement?.()?.classList.remove('route-drag-preview-stale');
+      }
+    } catch {
+      // Keep the smooth guide and latest routed preview when routing is unavailable.
+    } finally {
+      previewInFlight = false;
+      if (dragging && previewDirty) queueRoutedPreview();
+    }
+  }
+
+  function removePreviewLayers() {
+    preview?.remove();
+    guide?.remove();
+    preview = null;
+    guide = null;
+  }
 
   function onMove(ev) {
     if (!dragging) {
@@ -123,27 +200,57 @@ function onGrab(e) {
       route.waypoints.splice(idx, 0, grab);
       route.waypointKinds.splice(idx, 0, 'shape');
       preview = L.polyline(route.points, {
-        color: '#40d982', weight: 6, opacity: 0.9, dashArray: '8 8', interactive: false,
-        className: 'route-drag-preview',
+        color: '#8de9b4', weight: 7, opacity: 0.38, dashArray: '8 8', interactive: false,
+        className: 'route-drag-preview route-drag-preview-stale',
+      }).addTo(map);
+      guide = L.polyline(route.points, {
+        color: '#d5f8e4', weight: 4, opacity: 0.36, dashArray: '5 9', interactive: false,
+        className: 'route-drag-guide',
       }).addTo(map);
     }
-    const split = projection?.segIndex ?? 0;
-    preview.setLatLngs([
-      ...route.points.slice(0, split + 1),
-      [ev.latlng.lat, ev.latlng.lng],
-      ...route.points.slice(split + 1),
-    ]);
+    const point = [ev.latlng.lat, ev.latlng.lng];
+    route.waypoints[idx] = point;
+    preview.getElement?.()?.classList.add('route-drag-preview-stale');
+    showDragGuide(point);
+    queueRoutedPreview();
   }
 
-  function onUp(ev) {
+  async function onUp(ev) {
     map.off('mousemove', onMove);
     map.off('mouseup', onUp);
     map.dragging.enable();
-    if (dragging) {
+    const didDrag = dragging;
+    dragging = false;
+    if (didDrag) {
       swallowNextClick();
       route.waypoints[idx] = [ev.latlng.lat, ev.latlng.lng];
-      preview.remove();
-      preview = null;
+      clearTimeout(previewTimer);
+      previewDirty = false;
+      previewController?.abort();
+      if (previewRoute && commitPreview) {
+        const waypoints = route.waypoints.map(point => [...point]);
+        const finalKey = JSON.stringify(waypoints);
+        if (lastPreviewKey === finalKey && lastPreviewPoints) {
+          removePreviewLayers();
+          commitPreview(lastPreviewPoints);
+          return;
+        }
+        previewController = new AbortController();
+        try {
+          const points = await previewRoute(
+            waypoints,
+            [...route.waypointKinds],
+            previewController.signal,
+          );
+          preview?.setLatLngs(points);
+          removePreviewLayers();
+          commitPreview(points);
+          return;
+        } catch {
+          // Fall through to the normal rebuild and its straight-line fallback.
+        }
+      }
+      removePreviewLayers();
       rebuild();
     }
   }

@@ -11,9 +11,10 @@ function bearing(from, to) {
   return Math.round((Math.atan2(y, x) * 180 / Math.PI + 360) % 360);
 }
 
-export function waypointBearings(waypoints, range = 90) {
+export function waypointBearings(waypoints, range = 90, waypointKinds = []) {
   if (waypoints.length < 2) return '';
   return waypoints.map((point, index) => {
+    if (waypointKinds[index] === 'shape') return '';
     const from = index === 0 ? point : waypoints[index - 1];
     const to = index === waypoints.length - 1 ? point : waypoints[index + 1];
     const direction = bearing(from, to);

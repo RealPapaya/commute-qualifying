@@ -155,6 +155,13 @@ await page.mouse.move(editorBox.x + pathMid.x, editorBox.y + pathMid.y);
 await page.mouse.down();
 await page.mouse.move(editorBox.x + dragX, editorBox.y + dragY, { steps: 12 });
 await page.waitForSelector('.route-drag-preview', { state: 'attached' });
+await page.waitForSelector('.route-drag-guide', { state: 'attached' });
+await page.waitForFunction(() => {
+  const preview = document.querySelector('.route-drag-preview');
+  return preview && !preview.hasAttribute('stroke-dasharray') &&
+    !preview.classList.contains('route-drag-preview-stale');
+}, null, { timeout: 20000 });
+const expectedPathAfterDrop = await page.locator('.route-drag-preview').getAttribute('d');
 await page.mouse.up();
 await page.waitForFunction(prev =>
   document.querySelector('.route-line-editor')?.getAttribute('d') !== prev, pathBeforePathDrag,
@@ -167,6 +174,12 @@ if (await page.locator('.wp-marker').count() !== wpCountBeforePathDrag) {
 }
 if (await page.locator('.route-drag-preview').count()) {
   throw new Error('path drag preview was not removed after dropping the route');
+}
+if (await page.locator('.route-drag-guide').count()) {
+  throw new Error('path drag guide was not removed after dropping the route');
+}
+if (await page.locator('.route-line-editor').getAttribute('d') !== expectedPathAfterDrop) {
+  throw new Error('dropped route did not match the routed drag preview');
 }
 await shot('1b-path-dragged');
 

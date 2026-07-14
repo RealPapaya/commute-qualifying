@@ -16,3 +16,14 @@ test('waypointBearings leaves a duplicated waypoint unconstrained', () => {
 test('waypointBearings needs at least two points', () => {
   assert.equal(waypointBearings([[25, 121]]), '');
 });
+
+test('waypointBearings leaves invisible shaping points unconstrained', () => {
+  assert.equal(
+    waypointBearings(
+      [[25, 121], [25, 121.01], [25.01, 121.01]],
+      90,
+      ['endpoint', 'shape', 'endpoint'],
+    ),
+    '90,90;;0,90',
+  );
+});

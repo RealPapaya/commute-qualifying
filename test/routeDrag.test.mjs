@@ -1,11 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  buildDragGuide,
   findInsertIndex,
   moveEndpoint,
   normalizeWaypointKinds,
 } from '../js/routeDrag.js';
-import { pointAtDistance, cumulativeDistances } from '../js/geo.js';
+import { pointAtDistance, cumulativeDistances, projectOnRoute } from '../js/geo.js';
 
 // ---- fixture: 2 km straight route heading north, one point every 100 m
 // (mirrors the shape of an OSRM/straight-line route.points array) ----
@@ -41,6 +42,18 @@ test('findInsertIndex: off-route grab still projects to the nearest segment', ()
 
 test('findInsertIndex: fewer than 2 waypoints just appends', () => {
   assert.equal(findInsertIndex([routePoints[0]], routePoints, routePoints[5]), 1);
+});
+
+test('buildDragGuide bends several nearby segments instead of making one sharp spike', () => {
+  const grab = pointAtDistance(routePoints, cum, 1050);
+  const projection = projectOnRoute(grab, routePoints, cum);
+  const target = [grab[0], grab[1] + 0.002];
+  const guide = buildDragGuide(routePoints, projection, target);
+  assert.deepEqual(guide[0], routePoints[0]);
+  assert.deepEqual(guide.at(-1), routePoints.at(-1));
+  assert.deepEqual(guide[projection.segIndex + 1], target);
+  assert.ok(guide[projection.segIndex][1] > routePoints[projection.segIndex][1]);
+  assert.ok(guide[projection.segIndex + 2][1] > routePoints[projection.segIndex + 1][1]);
 });
 
 test('normalizeWaypointKinds keeps dragged shaping points hidden', () => {
