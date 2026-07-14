@@ -114,6 +114,14 @@ export function openRoute(existing, { creationMode = 'plan', name = '' } = {}) {
     closedLoop: false,
   };
   if (recordingMode && !existing) route.snap = false;
+  // Older recorded routes saved every GPS sample as a "必經點" (via). They are
+  // really just polyline shape. Migrate only the fully-broken legacy state (no
+  // shape points at all), so via markers a user later adds are left untouched.
+  if (route.recorded && route.waypoints?.length > 2 &&
+      !route.waypointKinds?.includes('shape')) {
+    route.waypointKinds = route.waypoints.map((_, i) =>
+      (i === 0 || i === route.waypoints.length - 1) ? 'endpoint' : 'shape');
+  }
   route.waypointKinds = normalizeWaypointKinds(route.waypoints, route.waypointKinds);
   lastRecordingPoint = route.recorded ? route.points.at(-1) ?? null : null;
   resetPlaceInputs();
@@ -560,7 +568,16 @@ function handleRecordingFix(position) {
     return;
   }
 
+  // Recorded GPS samples are invisible shaping points, not mandatory via
+  // markers — otherwise editing a recorded route shows one marker per fix and
+  // every sample becomes a "必經點". Demote the previous endpoint (now an
+  // interior point) to a shape point too, keeping only the true start/end.
+  const prevLastIndex = route.waypoints.length - 1;
   route.waypoints.push(point);
+  if (prevLastIndex > 0 && route.waypointKinds[prevLastIndex] === 'endpoint') {
+    route.waypointKinds[prevLastIndex] = 'shape';
+  }
+  route.waypointKinds.push('shape');
   route.waypointKinds = normalizeWaypointKinds(route.waypoints, route.waypointKinds);
   route.points.push(point);
   lastRecordingPoint = point;
