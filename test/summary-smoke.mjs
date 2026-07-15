@@ -79,6 +79,10 @@ const sheetBeforeExpand = await page.evaluate(() => ({
 if (sheetBeforeExpand.scrollY !== 0 || sheetBeforeExpand.state !== 'collapsed') {
   throw new Error(`Run sheet is not reset after summary dismissal: ${JSON.stringify(sheetBeforeExpand)}`);
 }
+// The run sheet now cycles collapsed → mid → expanded on tap; step to expanded.
+await page.click('.run-panel .sheet-handle');
+await page.waitForFunction(() =>
+  document.querySelector('.run-panel').dataset.sheetState === 'mid');
 await page.click('.run-panel .sheet-handle');
 await page.waitForFunction(() =>
   document.querySelector('.run-panel').dataset.sheetState === 'expanded');

@@ -88,16 +88,13 @@ await page.click('[data-view="routes"]');
 await page.click('#route-list [data-run]');
 await waitForMap('_runMap');
 await shot('4-run-collapsed');
+// The run sheet cycles collapsed → mid → expanded. Mid is the clock-focused
+// size: hero clock + a strip of sector colour bars, no numbers.
 await page.click('.run-panel .sheet-handle');
-await page.waitForSelector('.run-panel[data-sheet-state="expanded"]');
-await page.click('.run-panel .sheet-handle');
-await page.waitForSelector('.run-panel[data-sheet-state="collapsed"]');
+await page.waitForSelector('.run-panel[data-sheet-state="mid"]');
 await page.waitForTimeout(250);
-const runHandle = await page.locator('.run-panel .sheet-handle').boundingBox();
-await page.mouse.move(runHandle.x + runHandle.width / 2, runHandle.y + runHandle.height / 2);
-await page.mouse.down();
-await page.mouse.move(runHandle.x + runHandle.width / 2, runHandle.y - 120, { steps: 6 });
-await page.mouse.up();
+await shot('4-run-mid');
+await page.click('.run-panel .sheet-handle');
 await page.waitForSelector('.run-panel[data-sheet-state="expanded"]');
 await page.waitForTimeout(250);
 await shot('4-run');

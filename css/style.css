@@ -177,8 +177,10 @@ body {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  width: 180px;
+  width: 200px;
   padding: 12px;
+  display: grid;
+  gap: 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
@@ -834,10 +836,11 @@ body.home-active #topbar {
   color: #fff;
 }
 
-/* Sits in the .run-options grid next to the cursor picker; align it with the
-   picker's control row rather than its label. */
+/* Lives in the header settings menu (with Language and the cursor picker);
+   fill the menu's width so it reads as a full-width control. */
 .run-diagram-toggle {
-  align-self: end;
+  width: 100%;
+  justify-content: center;
 }
 
 .editor-options {
@@ -1858,7 +1861,8 @@ body.chromeless-topbar .track-diagram-head {
   }
 
   .editor-panel[data-sheet-state="expanded"],
-  .run-panel[data-sheet-state="expanded"] {
+  .run-panel[data-sheet-state="expanded"],
+  .run-panel[data-sheet-state="mid"] {
     transform: translateY(var(--sheet-drag-offset, 0));
   }
 
@@ -1866,6 +1870,50 @@ body.chromeless-topbar .track-diagram-head {
   .run-panel[data-dragging] {
     transition: none;
   }
+
+  /* MID size — focus on the hero clock. Everything but the clock and a strip of
+     sector colour bars is hidden with display:none, so the panel shrinks to fit
+     its own content and sits flush at the bottom (translateY 0, like expanded).
+     The bars carry only each sector's record status (pending / current /
+     all-time best = purple / session best = green / slower = yellow); the
+     numbers live in the expanded size. */
+  .run-panel[data-sheet-state="mid"] > .run-status,
+  .run-panel[data-sheet-state="mid"] > .toolbar,
+  .run-panel[data-sheet-state="mid"] > #gps-info {
+    display: none;
+  }
+
+  .run-panel[data-sheet-state="mid"] .run-clock {
+    font-size: clamp(52px, 17vw, 76px);
+    margin-bottom: 8px;
+  }
+
+  .run-panel[data-sheet-state="mid"] .sector-board {
+    flex-direction: row;
+    gap: 5px;
+    margin-bottom: 2px;
+  }
+
+  .run-panel[data-sheet-state="mid"] .sector-row {
+    display: block;
+    flex: 1;
+    min-height: 0;
+    height: 12px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: var(--border);
+  }
+
+  .run-panel[data-sheet-state="mid"] .sector-row > span {
+    display: none;
+  }
+
+  .run-panel[data-sheet-state="mid"] .sector-row.current { background: var(--yellow); }
+  .run-panel[data-sheet-state="mid"] .sector-row.set-purple { background: var(--purple); }
+  .run-panel[data-sheet-state="mid"] .sector-row.set-green { background: var(--green); }
+  .run-panel[data-sheet-state="mid"] .sector-row.set-yellow { background: var(--yellow); }
+  .run-panel[data-sheet-state="mid"] .sector-row.total-row { display: none; }
 
   .panel-head {
     gap: 8px;

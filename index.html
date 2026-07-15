@@ -59,6 +59,16 @@
             <option value="en" data-i18n="english">English</option>
           </select>
         </label>
+        <label class="run-picker cursor-picker">
+          <span data-i18n="cursor">游標</span>
+          <select id="run-cursor-type">
+            <option value="dot" data-i18n="cursorDot">圓點</option>
+            <option value="car" data-i18n="cursorCar">汽車 3D</option>
+            <option value="racecar" data-i18n="cursorRacecar">跑車 3D</option>
+            <option value="motorcycle" data-i18n="cursorMotorcycle">機車 3D</option>
+          </select>
+        </label>
+        <button id="btn-run-track-diagram" class="btn run-diagram-toggle" type="button" aria-pressed="false" title="顯示 F1 賽道圖圖層" data-i18n-title="trackDiagramTitle"><svg class="ui-icon"><use href="#icon-diagram"></use></svg><span data-i18n="trackDiagramLabel">賽道圖</span></button>
       </div>
     </details>
   </header>
@@ -240,7 +250,7 @@
         <div id="run-track-diagram-svg" class="track-diagram-svg"></div>
       </div>
     </div>
-    <div class="panel run-panel" data-bottom-sheet data-sheet-state="collapsed">
+    <div class="panel run-panel" data-bottom-sheet data-sheet-mid data-sheet-state="collapsed">
       <button class="sheet-handle" type="button" aria-label="展開控制面板" aria-expanded="false"></button>
       <div id="run-status" class="run-status"></div>
       <div id="offroute-flag" class="offroute-flag" role="alertdialog" aria-live="assertive" aria-labelledby="offroute-title" hidden>
@@ -257,18 +267,6 @@
       </div>
       <div id="run-clock" class="run-clock">--:--:---</div>
       <div id="sector-board" class="sector-board"></div>
-      <div class="run-options">
-        <button id="btn-run-track-diagram" class="btn run-diagram-toggle" type="button" aria-pressed="false" title="顯示 F1 賽道圖圖層" data-i18n-title="trackDiagramTitle"><svg class="ui-icon"><use href="#icon-diagram"></use></svg><span data-i18n="trackDiagramLabel">賽道圖</span></button>
-        <label class="run-picker cursor-picker">
-          <span data-i18n="cursor">游標</span>
-          <select id="run-cursor-type">
-            <option value="dot" data-i18n="cursorDot">圓點</option>
-            <option value="car" data-i18n="cursorCar">汽車 3D</option>
-            <option value="racecar" data-i18n="cursorRacecar">跑車 3D</option>
-            <option value="motorcycle" data-i18n="cursorMotorcycle">機車 3D</option>
-          </select>
-        </label>
-      </div>
       <div class="toolbar">
         <button id="btn-arm" class="btn primary big" data-i18n="startRun">開始</button>
         <button id="btn-abort" class="btn danger" hidden data-i18n="abort">Abort</button>
