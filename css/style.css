@@ -1548,6 +1548,33 @@ body.chromeless-topbar #run-map.track-mode .map-follow-controls {
   color: #0c0f12;
 }
 
+.map-follow-controls > :last-child {
+  border-right: 0;
+}
+
+.map-follow-compass {
+  display: grid;
+  place-items: center;
+  min-width: 42px;
+  padding-inline: 8px;
+}
+
+/* The diagram carries its own orientation — a compass over it is meaningless. */
+#run-map.track-mode .map-follow-compass {
+  display: none;
+}
+
+.compass-glyph {
+  width: 22px;
+  height: 22px;
+}
+
+.compass-needle {
+  transform-box: view-box;
+  transform-origin: 12px 12px;
+  transition: transform 0.18s ease;
+}
+
 .route-line-casing {
   stroke-linecap: round;
   stroke-linejoin: round;

@@ -35,6 +35,11 @@ let lapTrace = [];         // actually-driven path since the current lap/route b
 let continuationPending = false;
 let followUser = false;
 let trackFollowZoom = 2.4;
+let baseLayer = null;
+let orientation = 'north';  // preference: 'north' (歸北) | 'heading' (始終向前)
+let currentBearing = 0;     // degrees the map base is rotated to right now
+let selfMoving = false;     // true while a programmatic setView/fitBounds is running
+const ROTATED_PANES = ['overlayPane', 'markerPane', 'shadowPane', 'tooltipPane', 'popupPane'];
 
 const $ = id => document.getElementById(id);
 const CURSOR_TYPES = new Set(['dot', 'car', 'racecar', 'motorcycle']);
@@ -81,7 +86,16 @@ export function initRun(callbacks) {
   onRouteContinued = callbacks.onRouteContinued;
   map = L.map('run-map', { zoomControl: false }).setView([25.04, 121.53], 13);
   window._runMap = map; // test hook (e2e driver)
-  addBaseMap(map);
+  baseLayer = addBaseMap(map);
+  window._runBase = baseLayer; // test hook (orientation probe)
+
+  // A user pan/zoom drops follow-mode (press ⌖ again to resume). Programmatic
+  // recentres set selfMoving so they don't trip this.
+  map.on('moveend zoomend', () => { selfMoving = false; });
+  map.on('dragstart', () => { if (!selfMoving && followUser) setFollowUser(false, { pan: false }); });
+  map.on('zoomstart', () => { if (!selfMoving && followUser) setFollowUser(false, { pan: false }); });
+  // Keep the rotated overlays glued to the base whenever the view shifts.
+  map.on('move zoom', () => { if (currentBearing) applyOverlayRotation(); });
 
   $('btn-arm').addEventListener('click', armGps);
   $('btn-abort').addEventListener('click', () => stopSession('Aborted.'));
@@ -91,6 +105,7 @@ export function initRun(callbacks) {
   $('btn-restart-run').addEventListener('click', restartRun);
   $('btn-simulate').addEventListener('click', simulate);
   $('btn-follow-user').addEventListener('click', toggleFollowUser);
+  $('btn-compass').addEventListener('click', toggleOrientation);
   $('btn-run-track-diagram').addEventListener('click', toggleRunTrackDiagram);
   $('run-diagram-filter-sector-colors').addEventListener('change', refreshTrackDiagram);
   $('run-diagram-filter-checkpoints').addEventListener('change', refreshTrackDiagram);
@@ -98,6 +113,7 @@ export function initRun(callbacks) {
   $('run-cursor-type').addEventListener('change', () => setCursorType(selectedCursorType()));
   cursorType = selectedCursorType();
   sessionBests = [];
+  updateCompassButton();
   initSummary();
 }
 
@@ -144,6 +160,7 @@ function drawRunRoute() {
   // first, then fit — fitBounds on a 0×0 map picks a useless zoom
   setTimeout(() => {
     map.invalidateSize();
+    selfMoving = true;
     map.fitBounds(L.latLngBounds(route.points), { padding: [30, 30] });
   }, 50);
 }
@@ -171,6 +188,7 @@ function setMapMode(mode, { resetFilters = false } = {}) {
   $('run-map').classList.toggle('track-mode', mapMode === 'track');
 
   if (mapMode === 'track') {
+    setMapBearing(0);  // the diagram has its own orientation; unrotate the base
     if (resetFilters) {
       resetTrackDiagramFilters();
       resetTrackDiagramView($('run-track-diagram-svg'));
@@ -181,6 +199,7 @@ function setMapMode(mode, { resetFilters = false } = {}) {
   if (mapMode === 'street') setTimeout(() => {
     map?.invalidateSize();
     if (followUser && cursorLatLng) followCurrentPosition(cursorLatLng);
+    applyOrientation();
   }, 0);
 }
 
@@ -223,6 +242,8 @@ function showCursor(latLng) {
   if (selectedCursorType() !== cursorType) setCursorType(selectedCursorType());
   drawCursor(latLng, nextHeading);
   followCurrentPosition(latLng);
+  // In 始終向前 mode, keep rotating the base so the heading points up.
+  if (followUser && orientation === 'heading' && mapMode === 'street') setMapBearing(nextHeading);
 }
 
 function drawCursor(latLng, heading) {
@@ -277,13 +298,76 @@ function setFollowUser(enabled, { pan = true } = {}) {
   button.textContent = followUser ? '⌖ 跟隨中' : '⌖ 跟隨';
   button.title = followUser ? '停止跟隨位置' : '放大並跟隨位置';
   if (followUser && pan && cursorLatLng) followCurrentPosition(cursorLatLng, { zoomOnEnable: true });
+  // Heading-up only makes sense while centred on the driver: dropping follow
+  // snaps the base back to north (and drag works normally again).
+  applyOrientation();
   if (mapMode === 'track') refreshTrackDiagram();
 }
 
 function followCurrentPosition(latLng, { zoomOnEnable = false } = {}) {
   if (!followUser || mapMode !== 'street') return;
   const zoom = zoomOnEnable ? Math.max(map.getZoom(), DEFAULT_FOLLOW_ZOOM) : map.getZoom();
+  selfMoving = true;
   map.setView(latLng, zoom, { animate: false });
+}
+
+// ---------- Map orientation: 歸北 (north-up) / 始終向前 (heading-up) ----------
+
+// The compass button toggles the preference. Heading-up needs to be centred on
+// the driver, so enabling it also turns follow on.
+function toggleOrientation() {
+  orientation = orientation === 'heading' ? 'north' : 'heading';
+  if (orientation === 'heading' && !followUser) {
+    setFollowUser(true);   // setFollowUser → applyOrientation
+    return;
+  }
+  applyOrientation();
+  if (followUser && cursorLatLng) followCurrentPosition(cursorLatLng);
+}
+
+function applyOrientation() {
+  const headingUp = followUser && orientation === 'heading' &&
+    mapMode === 'street' && cursorLatLng != null;
+  setMapBearing(headingUp ? cursorHeading : 0);
+}
+
+// Rotate the vector base (MapLibre bearing) and glue Leaflet's overlay panes to
+// it. The MapLibre canvas lives in tilePane and rotates natively with no blank
+// corners; the route/markers/cursor sit in the other panes and must be rotated
+// by CSS to match. Follow keeps the driver at the container centre, so that
+// point is the shared rotation origin for both.
+function setMapBearing(bearing) {
+  const next = ((bearing % 360) + 360) % 360;
+  currentBearing = next;
+  baseLayer?.getMaplibreMap?.()?.setBearing?.(next);
+  applyOverlayRotation();
+  updateCompassButton();
+}
+
+function applyOverlayRotation() {
+  if (!map) return;
+  const panes = map.getPanes();
+  const size = map.getSize();
+  const mapPanePos = L.DomUtil.getPosition(panes.mapPane) || L.point(0, 0);
+  const origin = `${size.x / 2 - mapPanePos.x}px ${size.y / 2 - mapPanePos.y}px`;
+  const transform = currentBearing ? `rotate(${-currentBearing}deg)` : '';
+  ROTATED_PANES.forEach(name => {
+    const el = panes[name];
+    if (!el) return;
+    el.style.transformOrigin = origin;
+    el.style.transform = transform;
+  });
+}
+
+function updateCompassButton() {
+  const btn = $('btn-compass');
+  if (!btn) return;
+  const needle = btn.querySelector('.compass-needle');
+  if (needle) needle.style.transform = `rotate(${-currentBearing}deg)`;
+  const headingMode = orientation === 'heading';
+  btn.classList.toggle('active', headingMode);
+  btn.setAttribute('aria-pressed', String(headingMode));
+  btn.title = headingMode ? '始終向前（點擊切回歸北）' : '歸北（點擊切換始終向前）';
 }
 
 function bearing(from, to) {

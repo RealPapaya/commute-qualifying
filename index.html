@@ -217,6 +217,14 @@
     <div id="run-map" class="map">
       <div class="map-follow-controls" aria-label="跟隨位置控制" data-i18n-aria-label="followControls">
         <button id="btn-follow-user" class="map-follow-btn" type="button" aria-pressed="false" title="放大並跟隨位置" data-i18n="follow" data-i18n-title="followTitle">⌖ 跟隨</button>
+        <button id="btn-compass" class="map-follow-btn map-follow-compass" type="button" aria-pressed="false" title="歸北（點擊切換始終向前）" aria-label="地圖方向：歸北 / 始終向前">
+          <svg class="compass-glyph" viewBox="0 0 24 24" aria-hidden="true">
+            <g class="compass-needle">
+              <path d="M12 2.6 L15.2 12 L12 10.2 L8.8 12 Z" fill="#e10600"/>
+              <path d="M12 21.4 L8.8 12 L12 13.8 L15.2 12 Z" fill="#9aa0a8"/>
+            </g>
+          </svg>
+        </button>
       </div>
       <div id="run-track-diagram-overlay" class="track-diagram-overlay" hidden>
         <div class="track-diagram-head">
