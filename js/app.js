@@ -1,7 +1,8 @@
 // Bootstrap + view routing + routes list + history view.
 import { listRoutes, getRoute, saveRoute, deleteRoute, listRuns, deleteRun,
          allTimeBests } from './store.js';
-import { initEditor, openRoute, editorInvalidate } from './routeBuilder.js';
+import { initEditor, openRoute, editorInvalidate, hasUnsavedChanges,
+         saveEditor } from './routeBuilder.js';
 import { initRun, openRun, runInvalidate } from './run.js';
 import { showSummary } from './summary.js';
 import { fmtTime } from './timing.js';
@@ -61,7 +62,27 @@ function ensureRunLoaded() {
   }
 }
 
-$('btn-back').addEventListener('click', () => showView('home'));
+// Leaving the editor with unsaved edits routes through a save / discard / cancel
+// prompt so a stray tap on ← can't silently drop the work in progress.
+$('btn-back').addEventListener('click', () => {
+  if (document.querySelector('#view-editor.active') && hasUnsavedChanges()) {
+    $('leave-editor-dialog').returnValue = '';
+    $('leave-editor-dialog').showModal();
+    return;
+  }
+  showView('home');
+});
+
+$('leave-editor-dialog').addEventListener('close', event => {
+  const action = event.target.returnValue;
+  if (action === 'save') {
+    saveEditor(); // navigates to the routes list via onSaved on success
+  } else if (action === 'discard') {
+    editorLoadedId = null; // drop the in-memory edits; reload from the store next time
+    showView('home');
+  }
+  // 'cancel' / '' (Esc / backdrop) — stay in the editor
+});
 
 document.querySelectorAll('#tabs .tab').forEach(button => {
   button.addEventListener('click', () => {

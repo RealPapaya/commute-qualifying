@@ -27,15 +27,14 @@ const placeMoveSeq = new WeakMap();
 let recordingWatchId = null, recordingMarker = null;
 let recordingMode = false, lastRecordingPoint = null;
 let pendingPlaceInput = null;
+let savedSignature = null; // serialized route state as of the last load/save; drives hasUnsavedChanges()
 
 const MIN_RECORDED_CHECKPOINT_M = 50;
 const MAX_LIGHT_ROUTE_DISTANCE_M = 30;
 
-const TOOL_HELP = {
-  trace: '拖曳綠色路線可調整路徑；拖曳起點或終點可縮短、延長。',
-  light: 'Click on the map to mark a traffic light. Click a light for Street View / delete.',
-  sector: 'Drag the yellow handles along the route to move sector boundaries. Use +/− Sector to add or remove.',
-};
+// Editing hints are intentionally not shown as persistent copy. #tool-help is
+// only used for transient warnings (flashHelp), which clear themselves.
+const TOOLS = new Set(['trace', 'light', 'sector']);
 
 export function initEditor(callbacks) {
   onSaved = callbacks.onSaved;
@@ -139,6 +138,7 @@ export function openRoute(existing, { creationMode = 'plan', name = '' } = {}) {
   setTool('trace');
   hideTrackDiagram();
   redrawAll();
+  savedSignature = editorSignature(); // baseline for unsaved-change detection
   setTimeout(() => {
     map.invalidateSize(); // container may have been hidden — fix size before fitting
     if (route.points.length > 1) {
@@ -486,7 +486,6 @@ async function updateMovedPlace(input, point, { redrawPins = false } = {}) {
     selectedPlaces.set(input, movedPlace);
     input.value = placeLabel(movedPlace);
     if (redrawPins) redrawPlacePins();
-    setPlaceStatus(`地址已更新：${placeLabel(movedPlace)}`);
   } catch {
     // Keep the moved coordinate and the last known label when reverse lookup is unavailable.
   }
@@ -697,15 +696,15 @@ function addRecordedLight() {
 function flashHelp(msg) {
   const el = document.getElementById('tool-help');
   el.textContent = msg;
-  setTimeout(() => { el.textContent = TOOL_HELP[activeTool]; }, 4000);
+  setTimeout(() => { el.textContent = ''; }, 4000);
 }
 
 function setTool(tool) {
-  activeTool = TOOL_HELP[tool] ? tool : 'trace';
+  activeTool = TOOLS.has(tool) ? tool : 'trace';
   document.querySelectorAll('#editor-toolbar .tool').forEach(b =>
     b.classList.toggle('active', b.dataset.tool === activeTool));
   setRouteLineEditing(activeTool === 'trace');
-  document.getElementById('tool-help').textContent = TOOL_HELP[activeTool];
+  document.getElementById('tool-help').textContent = '';
   renderSectorHandles(activeTool === 'sector');
   updateToolActions(activeTool);
 }
@@ -1104,7 +1103,35 @@ function persist() {
     route.timingVersion = (prev.timingVersion ?? 1) + 1;
   }
   saveRoute(route);
+  savedSignature = editorSignature(); // in sync with the store again
   onSaved?.(route);
+}
+
+// Serialized snapshot of every field the editor can change. Compared against
+// the baseline captured on load to know whether there are unsaved edits.
+function editorSignature() {
+  if (!route) return null;
+  return JSON.stringify({
+    name: route.name ?? '',
+    waypoints: route.waypoints,
+    waypointKinds: route.waypointKinds,
+    points: route.points,
+    lights: visibleLights().map(light => light.point),
+    sectorBoundaries: route.sectorBoundaries,
+    snap: document.getElementById('snap-toggle').checked,
+    closedLoop: hasMatchingEndpoints() &&
+      document.getElementById('closed-loop-toggle').checked,
+  });
+}
+
+export function hasUnsavedChanges() {
+  return route != null && savedSignature != null && editorSignature() !== savedSignature;
+}
+
+// Save the current route; navigates to the routes list via onSaved on success,
+// or stays put (with an alert) if the route can't be saved yet.
+export function saveEditor() {
+  persist();
 }
 
 export function editorInvalidate() {

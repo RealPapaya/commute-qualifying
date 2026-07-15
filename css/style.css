@@ -2230,3 +2230,45 @@ body.chromeless-topbar .track-diagram-head {
   font-variation-settings: 'wdth' 62;
   letter-spacing: .02em;
 }
+
+/* Generic confirm dialog (unsaved-edits prompt on leaving the editor). */
+.app-dialog {
+  border: none;
+  padding: 0;
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  max-width: min(360px, calc(100vw - 32px));
+  width: calc(100vw - 32px);
+}
+
+.app-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.app-dialog-body {
+  padding: 20px;
+}
+
+.app-dialog-title {
+  font-weight: 800;
+  font-size: 16px;
+  margin-bottom: 6px;
+}
+
+.app-dialog-text {
+  color: var(--dim);
+  font-size: 13px;
+  margin-bottom: 18px;
+}
+
+.app-dialog-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.app-dialog-actions .btn {
+  width: 100%;
+}

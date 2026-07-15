@@ -292,6 +292,19 @@
     <div class="f1c-host"></div>
   </div>
 
+  <!-- Unsaved-edits prompt when leaving the editor -->
+  <dialog id="leave-editor-dialog" class="app-dialog">
+    <form method="dialog" class="app-dialog-body">
+      <p class="app-dialog-title">有未儲存的變更</p>
+      <p class="app-dialog-text">要先儲存再離開嗎？</p>
+      <div class="app-dialog-actions">
+        <button value="save" class="btn primary">儲存並離開</button>
+        <button value="discard" class="btn danger">不儲存離開</button>
+        <button value="cancel" class="btn" formnovalidate>取消</button>
+      </div>
+    </form>
+  </dialog>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
