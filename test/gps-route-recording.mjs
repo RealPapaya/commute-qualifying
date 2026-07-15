@@ -117,6 +117,11 @@ if (!await page.locator('#gps-recording-panel').isVisible() ||
     await page.locator('#place-route-form').isVisible()) {
   throw new Error('switch-to-recording did not enter GPS recording mode');
 }
+await page.click('#btn-switch-recording');
+if (!await page.locator('#place-route-form').isVisible() ||
+    await page.locator('#gps-recording-panel').isVisible()) {
+  throw new Error('switch button did not toggle back to planning mode');
+}
 page.once('dialog', dialog => dialog.accept());
 await page.click('#btn-delete-route');
 const afterDelete = await page.evaluate(() => ({

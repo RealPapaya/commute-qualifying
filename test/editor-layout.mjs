@@ -54,7 +54,7 @@ if (!await page.locator('#view-editor').evaluate(element => element.classList.co
 await page.click('.editor-panel .sheet-handle');
 
 const layout = await page.evaluate(() => {
-  const ids = ['btn-editor-advanced', 'btn-track-diagram', 'btn-save-route'];
+  const ids = ['btn-editor-advanced', 'btn-save-route'];
   const buttons = ids.map(id => document.getElementById(id));
   const startBox = document.querySelector('[data-place-row="start"]').getBoundingClientRect();
   const endBox = document.querySelector('[data-place-row="end"]').getBoundingClientRect();
@@ -75,7 +75,7 @@ if (layout.buildButtonExists) throw new Error('place route build button is still
 if (Math.max(...layout.buttonTops) - Math.min(...layout.buttonTops) > 1) {
   throw new Error(`editor route actions are not on one row: ${layout.buttonTops.join(', ')}`);
 }
-if (layout.buttonOrder.join(',') !== 'btn-editor-advanced,btn-track-diagram,btn-save-route') {
+if (layout.buttonOrder.join(',') !== 'btn-editor-advanced,btn-save-route') {
   throw new Error(`unexpected editor action order: ${layout.buttonOrder.join(',')}`);
 }
 if (layout.advancedActionIds.join(',') !== 'btn-undo-wp,btn-delete-route,btn-switch-recording') {
@@ -95,7 +95,8 @@ if (!await page.locator('#editor-advanced').isVisible() ||
 }
 const advancedStructure = await page.evaluate(() => ({
   headings: [...document.querySelectorAll('#editor-advanced h3')].map(heading => heading.id),
-  infoContainsStats: document.querySelector('[aria-labelledby="track-info-title"] #route-stats') !== null,
+  infoContainsStats: document.querySelector('[aria-labelledby="track-info-title"] #route-stats') !== null &&
+    document.querySelector('[aria-labelledby="track-info-title"] #btn-track-diagram') !== null,
   settingsContainControls: document.querySelector('[aria-labelledby="editor-settings-title"] #snap-toggle') !== null &&
     document.querySelector('[aria-labelledby="editor-settings-title"] #closed-loop-toggle') !== null &&
     document.querySelector('[aria-labelledby="editor-settings-title"] #btn-undo-wp') !== null &&

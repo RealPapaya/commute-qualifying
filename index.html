@@ -190,6 +190,9 @@
           <h3 id="track-info-title" data-i18n="trackInfo">賽道資訊</h3>
           <div class="panel-head editor-stats"><span id="route-stats" class="stats"></span></div>
           <div id="sector-summary" class="sector-summary"></div>
+          <div class="toolbar editor-diagram-actions">
+            <button id="btn-track-diagram" class="btn" type="button" disabled aria-pressed="false" title="Show F1-style circuit diagram" data-i18n-title="trackDiagramTitle"><svg class="ui-icon"><use href="#icon-diagram"></use></svg><span data-i18n="trackDiagramLabel">賽道圖</span></button>
+          </div>
         </section>
         <section class="editor-advanced-section" aria-labelledby="editor-settings-title">
           <h3 id="editor-settings-title" data-i18n="settings">設定</h3>
@@ -206,7 +209,6 @@
       </div>
       <div class="toolbar editor-route-actions">
         <button id="btn-editor-advanced" class="btn" type="button" aria-expanded="false" aria-controls="editor-advanced"><span data-i18n="advanced">進階</span></button>
-        <button id="btn-track-diagram" class="btn" type="button" disabled aria-pressed="false" title="Show F1-style circuit diagram" data-i18n-title="trackDiagramTitle"><svg class="ui-icon"><use href="#icon-diagram"></use></svg><span data-i18n="trackDiagramLabel">賽道圖</span></button>
         <button id="btn-save-route" class="btn primary"><svg class="ui-icon"><use href="#icon-save"></use></svg><span data-i18n="save">Save</span></button>
       </div>
     </div>

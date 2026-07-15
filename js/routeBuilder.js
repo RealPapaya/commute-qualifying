@@ -54,7 +54,7 @@ export function initEditor(callbacks) {
   document.getElementById('btn-editor-advanced').addEventListener('click', toggleAdvanced);
   document.getElementById('btn-undo-wp').addEventListener('click', undoWaypoint);
   document.getElementById('btn-delete-route').addEventListener('click', deleteCurrentRoute);
-  document.getElementById('btn-switch-recording').addEventListener('click', switchToRecordingMode);
+  document.getElementById('btn-switch-recording').addEventListener('click', toggleRecordingMode);
   document.getElementById('btn-add-sector').addEventListener('click', () => changeSectorCount(+1));
   document.getElementById('btn-remove-sector').addEventListener('click', () => changeSectorCount(-1));
   document.getElementById('btn-track-diagram').addEventListener('click', toggleTrackDiagram);
@@ -574,7 +574,20 @@ function updateRecordingControls() {
   const canMark = recording && lastRecordingPoint !== null;
   document.getElementById('btn-record-checkpoint').disabled = !canMark;
   document.getElementById('btn-record-light').disabled = !canMark;
-  document.getElementById('btn-switch-recording').disabled = recordingMode;
+  const switchBtn = document.getElementById('btn-switch-recording');
+  // The switch is a two-way toggle (plan ⇄ record). Only lock it while a live
+  // GPS watch is running — stop recording first before switching back.
+  switchBtn.disabled = recording;
+  setButtonLabel(switchBtn, recordingMode ? 'switchToPlanning' : 'switchToRecording');
+}
+
+// Update a button's translatable <span> label, keeping data-i18n in sync so a
+// later language switch re-renders the correct (toggled) key.
+function setButtonLabel(button, key) {
+  const span = button.querySelector('span[data-i18n]');
+  if (!span) return;
+  span.dataset.i18n = key;
+  span.textContent = t(key);
 }
 
 // Start the GPS watch directly in the button handler. iOS Safari requires the
@@ -659,12 +672,28 @@ function stopGpsRecording({ quiet = false } = {}) {
   if (document.getElementById('btn-start-gps-recording')) updateRecordingControls();
 }
 
+function toggleRecordingMode() {
+  if (recordingMode) switchToPlanMode();
+  else switchToRecordingMode();
+}
+
 function switchToRecordingMode() {
   if (recordingMode) return;
   recordingMode = true;
   lastRecordingPoint = route.points.at(-1) ?? null;
   document.getElementById('snap-toggle').disabled = true;
   setRecordingStatus(route.points.length ? 'Ready to resume recording.' : 'Ready to record.');
+  updateRecordingControls();
+  setTool('trace');
+  redrawAll();
+}
+
+function switchToPlanMode() {
+  if (!recordingMode) return;
+  if (recordingWatchId !== null) stopGpsRecording({ quiet: true });
+  recordingMode = false;
+  document.getElementById('snap-toggle').disabled = false;
+  setRecordingStatus('');
   updateRecordingControls();
   setTool('trace');
   redrawAll();

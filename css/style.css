@@ -845,10 +845,8 @@ body.home-active #topbar {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  border-top: 1px solid var(--hairline);
-  border-bottom: 1px solid var(--hairline);
-  margin: 2px 0 4px;
-  padding: 4px 3px;
+  margin: 2px 0 6px;
+  padding: 0;
 }
 
 .editor-options .toggle {
@@ -879,17 +877,13 @@ body.home-active #topbar {
 
 .editor-route-actions {
   align-items: stretch;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .editor-advanced {
   display: grid;
-  gap: 8px;
+  gap: 14px;
   margin: 6px 0;
-  padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface2);
 }
 
 .editor-advanced[hidden] {
@@ -897,8 +891,22 @@ body.home-active #topbar {
 }
 
 .editor-advanced-section + .editor-advanced-section {
-  padding-top: 8px;
-  border-top: 1px solid var(--hairline);
+  padding-top: 6px;
+}
+
+/* Bigger, easier-to-tap controls inside the advanced panel. */
+.editor-advanced .btn {
+  min-height: 44px;
+  padding: 8px 14px;
+  font-size: 13px;
+}
+
+.editor-diagram-actions {
+  display: grid;
+}
+
+.editor-diagram-actions .btn {
+  grid-column: 1 / -1;
 }
 
 .editor-advanced-section h3 {

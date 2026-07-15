@@ -137,7 +137,7 @@ if (editorDensity.panelPaddingTop > 10 ||
     editorDensity.toolbarInPanel ||
     Math.max(...editorDensity.routeActionTops) - Math.min(...editorDensity.routeActionTops) > 1 ||
     editorDensity.routeActionOrder.join(',') !==
-      'btn-editor-advanced,btn-track-diagram,btn-save-route' ||
+      'btn-editor-advanced,btn-save-route' ||
     !editorDensity.actionsAtBottom ||
     editorDensity.buildButtonExists ||
     /choose/i.test(editorDensity.toolHelp)) {
