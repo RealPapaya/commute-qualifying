@@ -289,6 +289,35 @@ body:not(.home-active) #tabs {
   display: none;
 }
 
+/* Editor / Run: no black banner. The topbar floats transparently over the map
+   (like home) so the map is full-bleed; only the back button — plus the editor
+   tool switcher and the settings gear — remain, as chips. pointer-events is off
+   on the bar itself so map clicks (tracing, dragging) pass through the empty
+   strip; each chip re-enables its own. */
+body.chromeless-topbar #topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  /* Keep a stable height whether or not the tool switcher is present (it isn't
+     in Run). Without this the empty bar collapses and the absolutely-centred
+     back button / settings gear spill above the viewport and get clipped. */
+  min-height: calc(62px + env(safe-area-inset-top));
+  padding: calc(10px + env(safe-area-inset-top)) 12px 10px;
+  background: transparent;
+  pointer-events: none;
+}
+
+body.chromeless-topbar #topbar h1 {
+  display: none;
+}
+
+body.chromeless-topbar .topbar-back,
+body.chromeless-topbar .settings-menu,
+body.chromeless-topbar #editor-toolbar {
+  pointer-events: auto;
+}
+
 .view {
   display: none;
   flex: 1;
@@ -1235,6 +1264,14 @@ body.home-active #topbar {
   background: rgba(255, 255, 255, 0.08);
 }
 
+/* Over the map the toolbar needs a solid backing to stay legible. */
+body.chromeless-topbar #topbar #editor-toolbar {
+  margin: 0;
+  background: rgba(13, 13, 18, 0.82);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(6px);
+}
+
 #topbar #editor-toolbar .btn.tool {
   color: rgba(255, 255, 255, 0.68);
 }
@@ -1470,6 +1507,17 @@ body.home-active #topbar {
   z-index: 2205;
 }
 
+/* Chromeless run, map mode: full-bleed map, so drop the follow control below
+   the floating back/settings chips instead of colliding with them at the top. */
+body.chromeless-topbar #run-map:not(.track-mode) .map-follow-controls {
+  top: calc(64px + env(safe-area-inset-top));
+}
+
+/* Chromeless run, track mode: clear the pushed-down diagram header instead. */
+body.chromeless-topbar #run-map.track-mode .map-follow-controls {
+  top: calc(144px + env(safe-area-inset-top));
+}
+
 .map-follow-btn,
 .map-follow-zoom {
   min-height: 42px;
@@ -1638,6 +1686,12 @@ body.home-active #topbar {
   padding: 10px 14px;
   border-bottom: 0;
   background: transparent;
+}
+
+/* Chromeless editor/run: the diagram fills the map from y=0, so drop its head
+   below the floating back button / tool switcher / settings chips. */
+body.chromeless-topbar .track-diagram-head {
+  padding-top: calc(62px + env(safe-area-inset-top));
 }
 
 .track-diagram-head .btn {

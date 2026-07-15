@@ -25,6 +25,10 @@ function showView(name) {
   document.querySelectorAll('#tabs .tab').forEach(tab =>
     tab.classList.toggle('active', tab.dataset.view === name));
   document.body.classList.toggle('home-active', name === 'home');
+  // editor / run drop the black banner: the topbar floats transparently over
+  // the map so it fills the screen, leaving just the back button (and, in the
+  // editor, the tool switcher) as chips.
+  document.body.classList.toggle('chromeless-topbar', name === 'editor' || name === 'run');
   $('btn-back').hidden = name === 'home';
   $('editor-toolbar').hidden = name !== 'editor';
   homeMapController?.setActive(name === 'home');
