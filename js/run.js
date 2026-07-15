@@ -49,6 +49,9 @@ const SIM_SPEEDUP = 10;
 const CLOCK_REFRESH_MS = 16;
 const BOARD_REFRESH_MS = 100;
 const CURSOR_TURN_THRESHOLD_M = 3;
+const HEADING_TANGENT_SPAN_M = 18;   // baseline for reading the road's direction
+const HEADING_SMOOTH_ALPHA = 0.3;    // EMA weight for the off-route GPS fallback
+const HEADING_UPDATE_DEG = 2;        // deadband before re-rotating the heading-up map
 const DEFAULT_FOLLOW_ZOOM = 18;
 const VEHICLE_MODELS = {
   car: `<svg viewBox="0 0 48 48" aria-hidden="true">
@@ -235,15 +238,60 @@ function setCursorType(type) {
 }
 
 function showCursor(latLng) {
-  const nextHeading = cursorLatLng && haversine(cursorLatLng, latLng) >= CURSOR_TURN_THRESHOLD_M ?
+  // Heading from a single GPS step is mostly noise. On the route we read the
+  // road's own direction (a straight road → a constant heading, no spin);
+  // off-route we fall back to a smoothed step bearing.
+  const gpsHeading = cursorLatLng && haversine(cursorLatLng, latLng) >= CURSOR_TURN_THRESHOLD_M ?
     bearing(cursorLatLng, latLng) : cursorHeading;
+  const target = travelHeading(latLng, gpsHeading);
+  const nextHeading = cursorLatLng == null ? (target ?? 0) : smoothHeading(cursorHeading, target);
   cursorLatLng = latLng;
   cursorHeading = nextHeading;
   if (selectedCursorType() !== cursorType) setCursorType(selectedCursorType());
   drawCursor(latLng, nextHeading);
   followCurrentPosition(latLng);
-  // In 始終向前 mode, keep rotating the base so the heading points up.
-  if (followUser && orientation === 'heading' && mapMode === 'street') setMapBearing(nextHeading);
+  // In 始終向前 mode, keep rotating the base so the heading points up — but only
+  // once it has actually turned, so GPS wobble doesn't twitch the whole map.
+  if (followUser && orientation === 'heading' && mapMode === 'street' &&
+      Math.abs(angularDiff(currentBearing, nextHeading)) >= HEADING_UPDATE_DEG) {
+    setMapBearing(nextHeading);
+  }
+}
+
+// Shortest signed rotation from a to b, in (-180, 180].
+function angularDiff(a, b) {
+  return ((b - a + 540) % 360) - 180;
+}
+
+function smoothHeading(current, target) {
+  if (current == null || target == null) return target ?? current ?? 0;
+  return (current + HEADING_SMOOTH_ALPHA * angularDiff(current, target) + 360) % 360;
+}
+
+// The road's forward direction at a distance along the route, read over a short
+// span so a single snapped vertex or GPS wobble can't swing it.
+function routeHeadingAt(distance) {
+  const total = route?.cum?.at(-1);
+  if (!(total > 0)) return null;
+  const half = HEADING_TANGENT_SPAN_M / 2;
+  let behind = distance - half, ahead = distance + half;
+  if (behind < 0) { behind = 0; ahead = Math.min(total, HEADING_TANGENT_SPAN_M); }
+  if (ahead > total) { ahead = total; behind = Math.max(0, total - HEADING_TANGENT_SPAN_M); }
+  const a = pointAtDistance(route.points, route.cum, behind);
+  const b = pointAtDistance(route.points, route.cum, ahead);
+  return haversine(a, b) >= 1 ? bearing(a, b) : null;
+}
+
+// Prefer the route tangent while on the route (stable); otherwise the GPS step.
+function travelHeading(latLng, gpsHeading) {
+  if (route?.cum) {
+    const proj = projectOnRoute([latLng[0], latLng[1]], route.points, route.cum);
+    if (proj && proj.offRoute <= OFF_ROUTE_M) {
+      const h = routeHeadingAt(proj.progress);
+      if (h != null) return h;
+    }
+  }
+  return gpsHeading;
 }
 
 function drawCursor(latLng, heading) {
