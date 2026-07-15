@@ -242,7 +242,7 @@
     </div>
     <div class="panel run-panel" data-bottom-sheet data-sheet-state="collapsed">
       <button class="sheet-handle" type="button" aria-label="展開控制面板" aria-expanded="false"></button>
-      <div id="run-status" class="run-status" data-i18n="runStatus">Press ARM, then drive. Timing starts when you cross the start line.</div>
+      <div id="run-status" class="run-status"></div>
       <div id="offroute-flag" class="offroute-flag" role="alertdialog" aria-live="assertive" aria-labelledby="offroute-title" hidden>
         <div id="offroute-title" class="offroute-title" data-i18n="offRoute">YELLOW FLAG — off route</div>
         <div class="offroute-copy" data-i18n="offRouteCopy">你已經偏離路線。要不要從目前位置開闢新路線，並讓本次計時繼續？</div>
@@ -270,9 +270,9 @@
         </label>
       </div>
       <div class="toolbar">
-        <button id="btn-arm" class="btn primary big" data-i18n="armGps">ARM GPS</button>
+        <button id="btn-arm" class="btn primary big" data-i18n="startRun">開始</button>
         <button id="btn-abort" class="btn danger" hidden data-i18n="abort">Abort</button>
-        <button id="btn-simulate" class="btn" data-i18n="simulate">▶ Simulate run</button>
+        <button id="btn-simulate" class="btn" data-i18n="simulate" hidden>▶ Simulate run</button>
       </div>
       <div id="gps-info" class="hint"></div>
     </div>

@@ -42,12 +42,14 @@ URL, or re-trace it there.
    verify you put it at the right intersection.
 3. **⏱ Sectors:** the route defaults to 3 equal sectors. Drag the yellow
    handles to move boundaries, +/− Sector to change the count (1–10).
-4. **Save**, then **Run**. Press **ARM GPS** before you set off — timing starts
+4. **Save**, then **Run**. Press **Start** before you set off — timing starts
    automatically when you cross the start of the route and stops at the end.
-   Don't touch the phone after arming; just keep the screen on and visible
+   Don't touch the phone after starting; just keep the screen on and visible
    (a dash mount is ideal).
 5. **▶ Simulate run** replays a synthetic drive through the real timing engine —
-   useful to demo the sector/PB logic without driving.
+   useful to demo the sector/PB logic without driving. It's a tester-only tool,
+   hidden by default; open the app with `?test=1` (or set `localStorage`
+   `commute-tester='1'`) to reveal it.
 
 ## Honest limitations (browser GPS, by design of this demo)
 

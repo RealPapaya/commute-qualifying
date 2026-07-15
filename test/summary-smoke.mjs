@@ -9,7 +9,7 @@ const errors = [];
 page.on('pageerror', e => errors.push(String(e)));
 page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
 
-await page.goto('http://localhost:8080/');
+await page.goto('http://localhost:8080/?test=1'); // ?test=1 reveals the tester-only simulator
 
 // ~1.1 km L-shaped route near 土城, three sectors, plus three earlier runs.
 await page.evaluate(() => {

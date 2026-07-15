@@ -1,6 +1,6 @@
 // Route editor: trace waypoints, snap to roads via OSRM (fallback: straight
 // lines), mark traffic lights (with Street View link-out), edit sectors.
-import { cumulativeDistances, projectOnRoute } from './geo.js';
+import { cumulativeDistances, projectOnRoute, haversine } from './geo.js';
 import { initSectorTool, renderSectorHandles, defaultBoundaries } from './sectors.js';
 import { initRouteDrag, moveEndpoint, normalizeWaypointKinds } from './routeDrag.js';
 import { renderTrackDiagram } from './trackDiagram.js';
@@ -26,11 +26,18 @@ const selectedPlaces = new WeakMap();
 const placeMoveSeq = new WeakMap();
 let recordingWatchId = null, recordingMarker = null;
 let recordingMode = false, lastRecordingPoint = null;
+let recordingGaps = [];        // breaks captured when recording is paused then resumed elsewhere
+let resumeGapFromPoint = null; // last recorded point while a resume's first fix is still pending
+let gapLayers = [];            // dashed overlays marking the current unfilled breaks
 let pendingPlaceInput = null;
 let savedSignature = null; // serialized route state as of the last load/save; drives hasUnsavedChanges()
 
 const MIN_RECORDED_CHECKPOINT_M = 50;
 const MAX_LIGHT_ROUTE_DISTANCE_M = 30;
+// A resume this far from where recording stopped is a genuine break in the track
+// (the driver moved while paused), not just GPS sampling. Below it we treat the
+// resume as continuous and record no gap.
+const GAP_MIN_M = 20;
 
 // Editing hints are intentionally not shown as persistent copy. #tool-help is
 // only used for transient warnings (flashHelp), which clear themselves.
@@ -123,6 +130,8 @@ export function openRoute(existing, { creationMode = 'plan', name = '' } = {}) {
   }
   route.waypointKinds = normalizeWaypointKinds(route.waypoints, route.waypointKinds);
   lastRecordingPoint = route.recorded ? route.points.at(-1) ?? null : null;
+  recordingGaps = [];
+  resumeGapFromPoint = null;
   resetPlaceInputs();
   seedEndpointInputsFromRoute();
   const snapToggle = document.getElementById('snap-toggle');
@@ -599,6 +608,11 @@ function startGpsRecording() {
   }
   if (recordingWatchId !== null) return;
 
+  // Resuming an already-recorded track: the driver may have moved while paused,
+  // so the first fix after resume can open a break. Remember where we left off
+  // and let the next accepted fix decide whether that break is real.
+  resumeGapFromPoint = route.points.length ? (lastRecordingPoint ?? route.points.at(-1)) : null;
+
   route.snap = false;
   route.recorded = true;
   document.getElementById('snap-toggle').checked = false;
@@ -617,6 +631,16 @@ function handleRecordingFix(position) {
   if (!point) {
     setRecordingStatus(`Recording — GPS ±${accuracy} m; waiting for a clearer or farther fix.`);
     return;
+  }
+
+  // First fix after a resume: if the driver moved while paused, the straight
+  // segment from the last recorded point to here is a break in the track. Record
+  // it so persist() can auto-connect it into a continuous route before saving.
+  if (resumeGapFromPoint) {
+    if (haversine(resumeGapFromPoint, point) > GAP_MIN_M) {
+      recordingGaps.push({ from: resumeGapFromPoint, to: point });
+    }
+    resumeGapFromPoint = null;
   }
 
   // Recorded GPS samples are invisible shaping points, not mandatory via
@@ -643,7 +667,10 @@ function handleRecordingFix(position) {
   if (route.points.length === 1) map.setView(point, Math.max(map.getZoom(), 16));
   else map.panTo(point, { animate: false });
   redrawAll({ notifyAfterRebuild: false });
-  setRecordingStatus(`Recording — ${route.points.length} GPS points, accuracy ±${accuracy} m.`);
+  const gapNote = recordingGaps.length
+    ? t('recordingGapWarn').replace('%n', recordingGaps.length)
+    : '';
+  setRecordingStatus(`Recording — ${route.points.length} GPS points, accuracy ±${accuracy} m.${gapNote}`);
   updateRecordingControls();
 }
 
@@ -915,10 +942,55 @@ function redrawAll({ notifyAfterRebuild = true } = {}) {
   redrawLine();
   redrawWaypoints();
   redrawLights();
+  redrawGaps();
   renderSectorHandles(activeTool === 'sector');
   refreshSectorSummary();
   refreshStats();
   if (notifyAfterRebuild) afterRebuildHandlers.forEach(fn => fn());
+}
+
+// Dashed red overlays over each unfilled break, so the driver can see where the
+// track is discontinuous before saving.
+function redrawGaps() {
+  gapLayers.forEach(layer => layer.remove());
+  gapLayers = recordingGaps.map(gap => L.polyline([gap.from, gap.to], {
+    color: '#e10600', weight: 4, opacity: 0.9, dashArray: '6 8',
+    interactive: false, className: 'recording-gap-line',
+  }).addTo(map));
+}
+
+// Connect every recorded break into a continuous track: road-snap (OSRM) between
+// the two ends and splice the routed points in. If snapping fails the straight
+// segment already joining the two points stands in, so the break is resolved
+// either way. Called from persist() before the route is saved.
+async function fillRecordingGaps() {
+  for (const gap of [...recordingGaps]) {
+    let routed = null;
+    try {
+      routed = await requestRouteGeometry([gap.from, gap.to], ['endpoint', 'endpoint']);
+    } catch {
+      routed = null;
+    }
+    if (routed && routed.length > 2) spliceGapPoints(gap.from, routed.slice(1, -1));
+  }
+  recordingGaps = [];
+  resumeGapFromPoint = null;
+  route.waypointKinds = normalizeWaypointKinds(route.waypoints, route.waypointKinds);
+  redrawAll();
+}
+
+// Insert routed shaping points immediately after `fromPoint` in both the point
+// polyline and the waypoint list (recorded routes keep the two in lockstep,
+// sharing the same point objects). The inserted samples are pure shape.
+function spliceGapPoints(fromPoint, inserted) {
+  if (!inserted.length) return;
+  const pi = route.points.indexOf(fromPoint);
+  if (pi >= 0) route.points.splice(pi + 1, 0, ...inserted);
+  const wi = route.waypoints.indexOf(fromPoint);
+  if (wi >= 0) {
+    route.waypoints.splice(wi + 1, 0, ...inserted);
+    route.waypointKinds.splice(wi + 1, 0, ...inserted.map(() => 'shape'));
+  }
 }
 
 function redrawLine() {
@@ -1112,10 +1184,19 @@ function refreshTrackDiagram() {
   });
 }
 
-function persist() {
+async function persist() {
   if (recordingWatchId !== null) {
     setRecordingStatus('Stop GPS recording before saving the route.');
     return;
+  }
+  // A route recorded across pauses is discontinuous and can't be raced: make the
+  // driver connect the breaks (auto road-snap) before it can be saved.
+  if (recordingGaps.length) {
+    const n = recordingGaps.length;
+    if (!confirm(t('fillGapsConfirm').replace('%n', n))) return;
+    setRecordingStatus(t('connectingGaps'));
+    await fillRecordingGaps();
+    setRecordingStatus(t('gapsConnected').replace('%n', n));
   }
   route.name ||= 'Unnamed route';
   route.lights = visibleLights().map(light => light.point);

@@ -33,7 +33,7 @@ const shot = async name => {
   console.log('shot:', name);
 };
 
-await page.goto('http://localhost:8080/');
+await page.goto('http://localhost:8080/?test=1'); // ?test=1 reveals the tester-only simulator
 await page.evaluate(() => localStorage.clear());
 await page.reload();
 

@@ -42,6 +42,19 @@ let selfMoving = false;     // true while a programmatic setView/fitBounds is ru
 const ROTATED_PANES = ['overlayPane', 'markerPane', 'shadowPane', 'tooltipPane', 'popupPane'];
 
 const $ = id => document.getElementById(id);
+
+// The simulator is for testers/QA only. Gate it on an explicit opt-in so normal
+// users never see it: a ?test / ?tester query flag, or a localStorage marker.
+function testerMode() {
+  try {
+    const params = new URLSearchParams(location.search);
+    if (params.has('test') || params.has('tester')) return true;
+    return localStorage.getItem('commute-tester') === '1';
+  } catch {
+    return false;
+  }
+}
+
 const CURSOR_TYPES = new Set(['dot', 'car', 'racecar', 'motorcycle']);
 const MAP_MODES = new Set(['street', 'track']);
 const SIM_FIX_INTERVAL_MS = 100;
@@ -106,6 +119,9 @@ export function initRun(callbacks) {
   $('btn-wait-track').addEventListener('click', waitForTrack);
   $('btn-manual-start').addEventListener('click', manualStart);
   $('btn-restart-run').addEventListener('click', restartRun);
+  // The simulator is a test/QA affordance, not a public feature: it only appears
+  // in tester mode (?test=1 / ?tester=1, or localStorage 'commute-tester'='1').
+  $('btn-simulate').hidden = !testerMode();
   $('btn-simulate').addEventListener('click', simulate);
   $('btn-follow-user').addEventListener('click', toggleFollowUser);
   $('btn-compass').addEventListener('click', toggleOrientation);
@@ -134,7 +150,7 @@ export function openRun(r) {
 
   drawRunRoute();
 
-  setStatus('Press ARM, then drive. Timing starts when you cross the start line.', '');
+  setStatus('', '');
   $('run-clock').textContent = fmtTime(null);
   renderBoard();
 }
@@ -437,7 +453,7 @@ function armGps() {
   }
   run = createRun(route);
   lapTrace = [];
-  setStatus('ARMED — waiting for GPS fix near the start line…', 'armed');
+  setStatus('等待 GPS 定位…越過起點自動開始計時', 'armed');
   $('btn-arm').disabled = true;
   $('btn-abort').hidden = false;
   renderBoard();
@@ -611,8 +627,8 @@ function showDistanceToStart(fix) {
   const d = fmtDistance(haversine([fix.lat, fix.lng], route.points[0]));
   const proj = projectOnRoute([fix.lat, fix.lng], route.points, route.cum);
   setStatus(proj && proj.offRoute <= OFF_ROUTE_M
-    ? `ARMED — 距離起點 ${d}，跨過起點自動開始計時`
-    : `ARMED — 尚未在路線上（距離起點 ${d}）`, 'armed');
+    ? `距離起點 ${d}，跨過起點自動開始計時`
+    : `尚未在路線上（距離起點 ${d}）`, 'armed');
 }
 
 function fmtDistance(m) {

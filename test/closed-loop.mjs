@@ -88,7 +88,7 @@ await page.route('https://nominatim.openstreetmap.org/reverse**', async route =>
 await page.route('https://unpkg.com/**', route => route.fulfill({ body: '' }));
 
 try {
-  await page.goto('http://127.0.0.1:8080/');
+  await page.goto('http://127.0.0.1:8080/?test=1'); // ?test=1 reveals the tester-only simulator
   await page.evaluate(() => localStorage.clear());
   await page.reload();
 

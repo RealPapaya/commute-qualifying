@@ -134,17 +134,31 @@ stale responses. Keep that pattern when adding another fetch.
 
 ### GPS session (`js/run.js`)
 
-`watchPosition` must be called **synchronously inside the ARM click handler** — iOS Safari fails
-a geolocation request made after an `await` with `PERMISSION_DENIED`, silently, even on an
-already-granted origin. The wake lock is requested afterwards for that reason. Only
-`PERMISSION_DENIED` ends the watch; `TIMEOUT` and `POSITION_UNAVAILABLE` are transient (tunnels,
-cold start) and the session stays live.
+`watchPosition` must be called **synchronously inside the Start click handler** (`btn-arm`, now
+labelled 開始/Start) — iOS Safari fails a geolocation request made after an `await` with
+`PERMISSION_DENIED`, silently, even on an already-granted origin. The wake lock is requested
+afterwards for that reason. Only `PERMISSION_DENIED` ends the watch; `TIMEOUT` and
+`POSITION_UNAVAILABLE` are transient (tunnels, cold start) and the session stays live. The Run
+view intentionally shows just the one Start button at rest (Abort appears once running).
 
 Geolocation needs a **secure context**: `localhost` or HTTPS. A phone hitting
 `http://<pc-ip>:8080` gets no GPS — tunnel it (`npx ngrok http 8080`) or host it over HTTPS.
 
 `▶ Simulate run` replays a synthetic drive through the *same* `feedFix` path at 10× speed, so
-it exercises the real timing engine. `record.simulated` is set from `simTimer != null`.
+it exercises the real timing engine. `record.simulated` is set from `simTimer != null`. It is a
+**tester-only** control: `btn-simulate` starts `hidden` and `run.js`'s `testerMode()` only
+reveals it under `?test=1` / `?tester=1` or `localStorage['commute-tester']='1'`. Browser tests
+that drive it (`e2e-drive`, `summary-smoke`, `closed-loop`) navigate with `?test=1`.
+
+### Recording breaks / auto-connect (`js/routeBuilder.js`)
+
+GPS recording can be paused and resumed. If the driver moves while paused, the resume opens a
+**break** — a straight jump in the polyline that isn't a real track. `startGpsRecording` arms
+`resumeGapFromPoint`; the first accepted fix past `GAP_MIN_M` records a `{from,to}` into
+`recordingGaps` (drawn as a dashed red overlay). Such a route can't be saved as-is: `persist()`
+is async and, when `recordingGaps` is non-empty, confirms then `fillRecordingGaps()` road-snaps
+(OSRM) each break and splices the routed shape points into `route.points`/`route.waypoints` in
+lockstep (falling back to the straight segment if OSRM fails), so the saved track is continuous.
 
 ## Conventions
 
