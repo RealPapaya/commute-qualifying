@@ -220,7 +220,6 @@
       </div>
       <div id="run-track-diagram-overlay" class="track-diagram-overlay" hidden>
         <div class="track-diagram-head">
-          <button id="btn-run-diagram-back" class="btn" data-i18n="backRun">返回 Run</button>
           <div class="track-diagram-title" data-i18n="trackDiagramMode">賽道圖模式</div>
           <div class="track-diagram-filters" aria-label="Run 賽道圖篩選" data-i18n-aria-label="runTrackFilters">
             <label class="toggle"><input type="checkbox" id="run-diagram-filter-sector-colors" checked><span data-i18n="sectorColors">Sector colors</span></label>
@@ -249,13 +248,7 @@
       <div id="run-clock" class="run-clock">--:--:---</div>
       <div id="sector-board" class="sector-board"></div>
       <div class="run-options">
-        <label class="run-picker">
-          <span data-i18n="mapMode">Map mode</span>
-          <select id="run-map-mode">
-            <option value="street" data-i18n="streetMap">Street map</option>
-            <option value="track" data-i18n="trackDiagramMode">Track diagram</option>
-          </select>
-        </label>
+        <button id="btn-run-track-diagram" class="btn run-diagram-toggle" type="button" aria-pressed="false" title="顯示 F1 賽道圖圖層" data-i18n-title="trackDiagramTitle"><svg class="ui-icon"><use href="#icon-diagram"></use></svg><span data-i18n="trackDiagramLabel">賽道圖</span></button>
         <label class="run-picker cursor-picker">
           <span data-i18n="cursor">游標</span>
           <select id="run-cursor-type">

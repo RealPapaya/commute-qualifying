@@ -83,12 +83,15 @@ export function splitTitle(name) {
 // (store.saveRun has already appended `record`, so it is included here).
 export function buildSummaryData(route, record, runs) {
   const lengthM = cumulativeDistances(route.points).at(-1);
-  const done = runs.filter(r => r.completed);
+  // Disqualified laps (strayed too far off the route) are not valid times, so
+  // they never feed lap counts, ranking or the fastest-lap stat.
+  const disqualified = record.disqualified === true;
+  const done = runs.filter(r => r.completed && !r.disqualified);
   const comparable = done.filter(r => r.timingVersion === route.timingVersion);
 
   const best = allTimeBests(route.id, route.sectorBoundaries.length + 1,
                             route.timingVersion).total;
-  const isPB = best != null && record.totalTime <= best;
+  const isPB = !disqualified && best != null && record.totalTime <= best;
   // Rank this run against every comparable run, including itself.
   const rank = comparable.filter(r => r.totalTime < record.totalTime).length + 1;
   const firstYear = done.length
@@ -113,7 +116,13 @@ export function buildSummaryData(route, record, runs) {
     trackTime: best,
     rank,
     isPB,
-    badge: {
+    disqualified,
+    conformance: record.conformance,
+    badge: disqualified ? {
+      num: 'DSQ',
+      l1: `符合度 ${Math.round((record.conformance ?? 0) * 100)}%`,
+      l2: '取消資格',
+    } : {
       num: `P${rank}`,
       l1: isPB || best == null ? 'PERSONAL' : `+${((record.totalTime - best) / 1000).toFixed(3)}`,
       l2: isPB || best == null ? 'BEST' : 'OFF PB',
@@ -186,7 +195,7 @@ export function renderSummary(container, data) {
   const badge = data.badge;
 
   container.innerHTML = `
-    <div class="f1c-card">
+    <div class="f1c-card${data.disqualified ? ' f1c-dsq' : ''}">
       <div class="f1c-head">
         <div class="f1c-mark" aria-label="Commute Qualifying">CQ</div>
         <div class="f1c-head-text">
@@ -223,7 +232,7 @@ export function renderSummary(container, data) {
               <span class="f1c-tracktime-value">${numHtml(fmtClock(data.trackTime))}</span>
             </div>
           </div>
-          <div class="f1c-badge">
+          <div class="f1c-badge${data.disqualified ? ' f1c-badge-dsq' : ''}">
             <div class="f1c-badge-num">${numHtml(badge.num)}</div>
             <div class="f1c-badge-team">${numHtml(badge.l1)}<br>${esc(badge.l2)}</div>
           </div>

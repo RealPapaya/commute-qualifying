@@ -64,16 +64,27 @@ waypoints verbatim when snapping is off or fails). `sectorBoundaries` are **mete
 ascending, exclusive of 0 and total — so N boundaries means N+1 sectors.
 
 A **run** record is `{ id, routeId, timingVersion, date, sectorTimes[], totalTime, completed,
-simulated }`.
+simulated, conformance, disqualified, actualTrace[] }`. `actualTrace` is the actually-driven
+path (accepted GPS fixes for that lap); `conformance` (0–1) is the fraction of that path's
+distance that stayed within the route corridor (`js/conformance.js`); `disqualified` is true
+when `conformance < 0.95` (labelled **DSQ** in the UI).
+
+### Conformance / DSQ
+
+`js/conformance.js` is pure. `js/run.js` accumulates `lapTrace` from every accepted fix while
+`running` (resetting it on arm / lap-complete / route continuation) and scores it in
+`saveCompletedLap`. A DSQ lap is off-route driving, not a valid time: it is still saved and
+shown (greyed **DSQ** in history, a DSQ badge on the summary) but never becomes a best, and the
+off-route escape hatch (`continueOnNewRoute`) re-measures conformance against the new route.
 
 ### `timingVersion` is the central invariant
 
 Old times are not comparable to a changed track. `routeBuilder.persist()` bumps
 `route.timingVersion` whenever `points` or `sectorBoundaries` differ from the saved copy, and
 `store.allTimeBests()` only considers runs whose `timingVersion` matches the route's current
-one. Anything that mutates route geometry must go through `persist()`, and anything that reads
-bests must pass the current `timingVersion` — otherwise PBs silently compare across different
-tracks.
+one (and which are not `disqualified`). Anything that mutates route geometry must go through
+`persist()`, and anything that reads bests must pass the current `timingVersion` — otherwise
+PBs silently compare across different tracks.
 
 ### Timing engine invariants (`js/timing.js`)
 

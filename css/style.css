@@ -630,6 +630,12 @@ body.home-active #topbar {
   line-height: 1.35;
 }
 
+/* Disqualified lap badge in the history list. */
+.run-list .meta-dsq {
+  color: #e10600;
+  font-weight: 800;
+}
+
 .route-list .actions,
 .run-list .actions {
   display: grid;
@@ -792,10 +798,17 @@ body.home-active #topbar {
   box-shadow: none;
 }
 
-#btn-track-diagram[aria-pressed="true"] {
+#btn-track-diagram[aria-pressed="true"],
+.run-diagram-toggle[aria-pressed="true"] {
   background: var(--bar);
   border-color: var(--bar);
   color: #fff;
+}
+
+/* Sits in the .run-options grid next to the cursor picker; align it with the
+   picker's control row rather than its label. */
+.run-diagram-toggle {
+  align-self: end;
 }
 
 .editor-options {
@@ -1611,6 +1624,12 @@ body.home-active #topbar {
   z-index: 2000;
 }
 
+/* The run diagram is a toggle layer, like the editor's: keep the run panel (and
+   its 賽道圖 toggle button) above it so the same button dismisses the overlay. */
+#run-track-diagram-overlay {
+  z-index: 2000;
+}
+
 .track-diagram-head {
   display: flex;
   align-items: center;
@@ -2117,6 +2136,11 @@ body.home-active #topbar {
   font: 800 calc(20.29 * var(--u)) / 1 'Archivo', sans-serif;
   font-variation-settings: 'wdth' 78;
   letter-spacing: -.02em;
+}
+
+/* A disqualified lap: the badge reads DSQ in F1 red instead of the P-position. */
+.f1c-badge-dsq .f1c-badge-num {
+  color: #e10600;
 }
 
 .f1c-badge-team {

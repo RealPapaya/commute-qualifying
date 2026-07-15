@@ -6,6 +6,7 @@ import { createRun, feedFix, elapsed, classifySector, fmtTime, fmtDelta, canStar
          MANUAL_START_RADIUS_M } from './timing.js';
 import { allTimeBests, saveRun, saveRoute, newId, listRuns } from './store.js';
 import { createContinuationRoute, requestRoadContinuation } from './routeContinuation.js';
+import { computeConformance, isDisqualified } from './conformance.js';
 import { renderTrackDiagram } from './trackDiagram.js';
 import { resetTrackDiagramView } from './trackDiagramInteraction.js';
 import { initSummary, showSummary } from './summary.js';
@@ -30,6 +31,7 @@ let trackCursorDistance = null;
 let offRouteFlagActive = false;
 let offRoutePromptDismissed = false;
 let latestFix = null;
+let lapTrace = [];         // actually-driven path since the current lap/route began
 let continuationPending = false;
 let followUser = false;
 let trackFollowZoom = 2.4;
@@ -89,8 +91,7 @@ export function initRun(callbacks) {
   $('btn-restart-run').addEventListener('click', restartRun);
   $('btn-simulate').addEventListener('click', simulate);
   $('btn-follow-user').addEventListener('click', toggleFollowUser);
-  $('run-map-mode').addEventListener('change', () => setMapMode(selectedMapMode(), { resetFilters: true }));
-  $('btn-run-diagram-back').addEventListener('click', hideTrackDiagram);
+  $('btn-run-track-diagram').addEventListener('click', toggleRunTrackDiagram);
   $('run-diagram-filter-sector-colors').addEventListener('change', refreshTrackDiagram);
   $('run-diagram-filter-checkpoints').addEventListener('change', refreshTrackDiagram);
   $('run-diagram-filter-lights').addEventListener('change', refreshTrackDiagram);
@@ -105,9 +106,10 @@ export function openRun(r) {
   route = { ...r, cum: cumulativeDistances(r.points) };
   trackCursorDistance = null;
   latestFix = null;
+  lapTrace = [];
   resetOffRouteFlag();
   updateManualStartControls();
-  setMapMode(selectedMapMode(), { resetFilters: true });
+  setMapMode('street');
   bests = allTimeBests(route.id, route.sectorBoundaries.length + 1, route.timingVersion);
   sessionBests = route.sectorBoundaries.map(() => null).concat([null]);
 
@@ -146,13 +148,10 @@ function drawRunRoute() {
   }, 50);
 }
 
-function hideTrackDiagram() {
-  setMapMode('street');
-}
-
-function selectedMapMode() {
-  const value = $('run-map-mode')?.value ?? 'street';
-  return MAP_MODES.has(value) ? value : 'street';
+// The run's track diagram is a toggle-on layer over the map, mirroring the
+// editor's 賽道圖 button — not a separate mode with its own chrome.
+function toggleRunTrackDiagram() {
+  setMapMode(mapMode === 'track' ? 'street' : 'track', { resetFilters: true });
 }
 
 function setMapMode(mode, { resetFilters = false } = {}) {
@@ -160,8 +159,11 @@ function setMapMode(mode, { resetFilters = false } = {}) {
   const nextMode = requested === 'track' && route?.points?.length >= 2 ? 'track' : 'street';
   mapMode = nextMode;
 
-  const picker = $('run-map-mode');
-  if (picker && picker.value !== mapMode) picker.value = mapMode;
+  const button = $('btn-run-track-diagram');
+  if (button) {
+    button.setAttribute('aria-pressed', String(mapMode === 'track'));
+    button.classList.toggle('active', mapMode === 'track');
+  }
 
   // Unhide before rendering: the diagram sizes its viewBox from the container,
   // which has no box while [hidden].
@@ -302,6 +304,7 @@ function armGps() {
     return;
   }
   run = createRun(route);
+  lapTrace = [];
   setStatus('ARMED — waiting for GPS fix near the start line…', 'armed');
   $('btn-arm').disabled = true;
   $('btn-abort').hidden = false;
@@ -354,6 +357,7 @@ function onGpsError(err) {
 function simulate() {
   stopSession();
   run = createRun(route);
+  lapTrace = [];
   setStatus('SIMULATING — replaying a synthetic drive at 10× speed.', 'armed');
   $('btn-arm').disabled = true;
   $('btn-abort').hidden = false;
@@ -438,6 +442,9 @@ async function continueOnNewRoute() {
     saveRoute(continuation.route);
     bests = allTimeBests(route.id, route.sectorBoundaries.length + 1, route.timingVersion);
     sessionBests = route.sectorBoundaries.map(() => null).concat([null]);
+    // Conformance is measured against the route you are actually on: reset the
+    // trace so the new route is scored fresh from the current position.
+    lapTrace = [[acceptedFix.lat, acceptedFix.lng]];
     resetOffRouteFlag();
     drawRunRoute();
     updateTrackCursor();
@@ -495,6 +502,7 @@ function restartRun() {
   const restarted = createRun(route);
   if (!startRunAtFix(restarted, fix)) return;
   run = restarted;
+  lapTrace = [[fix.lat, fix.lng]];
   resetOffRouteFlag();
   setStatus('LIVE — timer restarted from the current position.', 'live');
   $('run-clock').textContent = fmtTime(0);
@@ -520,6 +528,10 @@ function handleFix(fix) {
   latestFix = fix;
   const ev = feedFix(run, fix);
 
+  // Record the actually-driven path (including off-route strays, which is what
+  // drags conformance down) so the lap can be scored for a DSQ at the finish.
+  if (run.state === 'running' || ev === 'finish') lapTrace.push([fix.lat, fix.lng]);
+
   showCursor([fix.lat, fix.lng]);
   updateTrackCursor();
   updateManualStartControls(fix);
@@ -542,6 +554,8 @@ function handleFix(fix) {
 }
 
 function saveCompletedLap(lap) {
+  const { conformance } = computeConformance(lapTrace, route.points, route.cum);
+  const disqualified = isDisqualified(conformance);
   const record = {
     id: newId(),
     routeId: route.id,
@@ -551,21 +565,38 @@ function saveCompletedLap(lap) {
     totalTime: lap.totalTime,
     completed: true,
     simulated: simTimer != null,
+    conformance,
+    disqualified,
+    actualTrace: lapTrace.map(p => [p[0], p[1]]),
   };
   saveRun(record);
-  lap.sectorTimes.forEach((t, i) => {
-    if (sessionBests[i] == null || t < sessionBests[i]) sessionBests[i] = t;
-  });
+  // A disqualified lap is off-route driving, not a valid time: it never sets a
+  // session best (and store.allTimeBests already excludes it from all-time PBs).
+  if (!disqualified) {
+    lap.sectorTimes.forEach((t, i) => {
+      if (sessionBests[i] == null || t < sessionBests[i]) sessionBests[i] = t;
+    });
+  }
   bests = allTimeBests(route.id, route.sectorBoundaries.length + 1, route.timingVersion);
   onRunSaved?.(record);
   return record;
+}
+
+// "符合度 92%" — a one-line DSQ notice for the run status board.
+function dsqNotice(record) {
+  return `DSQ — 符合度 ${Math.round(record.conformance * 100)}%（開新路線可重新計時）`;
 }
 
 function finishLap() {
   const lap = run?.completedLap;
   if (!lap) return;
   const record = saveCompletedLap(lap);
-  setStatus(`LAP ${lap.number} FINISHED — ${fmtTime(lap.totalTime)}${record.simulated ? ' (simulated)' : ''}. Keep going for the next lap.`, 'live');
+  // Seed the next lap's trace with the crossing fix so measurement stays continuous.
+  lapTrace = latestFix ? [[latestFix.lat, latestFix.lng]] : [];
+  setStatus(record.disqualified
+    ? `LAP ${lap.number} ${dsqNotice(record)}`
+    : `LAP ${lap.number} FINISHED — ${fmtTime(lap.totalTime)}${record.simulated ? ' (simulated)' : ''}. Keep going for the next lap.`,
+    record.disqualified ? 'yellow' : 'live');
   $('run-clock').textContent = fmtTime(0);
   renderBoard();
 }
@@ -578,7 +609,10 @@ function finishRun() {
   // classify BEFORE merging this run into bests
   renderBoard();
   const record = saveCompletedLap(lap);
-  setStatus(`FINISHED — ${fmtTime(lap.totalTime)}${record.simulated ? ' (simulated)' : ''}`, 'live');
+  setStatus(record.disqualified
+    ? dsqNotice(record)
+    : `FINISHED — ${fmtTime(lap.totalTime)}${record.simulated ? ' (simulated)' : ''}`,
+    record.disqualified ? 'yellow' : 'live');
   $('run-clock').textContent = fmtTime(lap.totalTime);
   stopSession(null, /*keepBoard*/ true);
   showSummary(route, record, listRuns(route.id));
@@ -597,6 +631,7 @@ function stopSession(statusMsg, keepBoard = false) {
   resetOffRouteFlag();
   if (!keepBoard) {
     run = null;
+    lapTrace = [];
     if (posMarker) { posMarker.remove(); posMarker = null; }
     cursorLatLng = null;
     trackCursorDistance = null;

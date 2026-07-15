@@ -242,7 +242,8 @@ function renderHistory() {
     return `<li>
       <div>
         <div><strong>${fmtTime(run.totalTime)}</strong>
-          ${run.simulated ? `<span class="meta">${t('simulated')}</span>` : ''}</div>
+          ${run.simulated ? `<span class="meta">${t('simulated')}</span>` : ''}
+          ${run.disqualified ? `<span class="meta meta-dsq">${t('dsq')}</span>` : ''}</div>
         <div class="meta">${d.toLocaleString()} · ${sectors}</div>
       </div>
       <div class="actions">

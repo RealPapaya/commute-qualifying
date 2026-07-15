@@ -55,11 +55,12 @@ export function deleteRun(id) {
 
 // All-time bests for a route: per-sector minimums and best total, across
 // completed runs whose timingVersion matches the route's current geometry
-// (editing the route or its sectors invalidates old comparisons).
-// Returns { sectors: [ms|null,...], total: ms|null }.
+// (editing the route or its sectors invalidates old comparisons). Disqualified
+// laps (drove too far off the route) are off-route driving, not valid times, so
+// they never count. Returns { sectors: [ms|null,...], total: ms|null }.
 export function allTimeBests(routeId, sectorCount, timingVersion) {
   const runs = listRuns(routeId)
-    .filter(r => r.completed && r.timingVersion === timingVersion);
+    .filter(r => r.completed && r.timingVersion === timingVersion && !r.disqualified);
   const sectors = Array.from({ length: sectorCount }, (_, i) => {
     const times = runs.map(r => r.sectorTimes[i]).filter(t => t != null);
     return times.length ? Math.min(...times) : null;
