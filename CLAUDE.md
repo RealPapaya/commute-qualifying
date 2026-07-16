@@ -76,13 +76,21 @@ of that path's distance that stayed within the route corridor (`js/conformance.j
 
 `js/summary.js` renders the F1 circuit-info card (the `#summary-overlay`). Its **詳細數據 /
 DETAILS** button dynamically imports `js/detail.js`, a deeper telemetry sheet (`#detail-overlay`,
-stacked above the card at a higher z-index). `js/detail.js` keeps the pure/DOM split: everything
-above `renderDetail` (`buildDetailData`, `computeSpeedSamples`, `detectStops`, `sectorSpans`,
-`sectorSpeed`) is DOM-free and unit-tested (`test/detail.test.mjs`). The sheet shows per-sector
-speed (avg/max), stop records (clustered near-stationary fixes, attributed to nearby lights),
-an ideal/theoretical-best lap (sum of best-ever sectors) with time-on-the-table, a speed-vs-
-distance profile, and a lap-by-lap comparison table of per-sector deltas (green = this lap
-faster, red = slower). Sector colours reuse `classifySector`'s purple/green/yellow semantics.
+stacked above the card at a higher z-index). The sheet deliberately shares the card's visual
+language — **white surface, black text, Archivo, black section bars** — and is **single-language**,
+driven by the app's i18n setting (a local `STR`/`L()` table in `detail.js`, re-rendered on
+`languagechange`); never mix both languages. `js/detail.js` keeps the pure/DOM split: everything
+above `renderDetail` (`buildDetailData`, `computeSpeedSamples`, `speedAtDistance`, `detectStops`,
+`sectorSpans`, `sectorSpeed`) is DOM-free and unit-tested (`test/detail.test.mjs`).
+
+Sections: a **speed map** (the hero) — the route drawn via `trackDiagram.computeProjection`, each
+segment coloured by the speed driven there (red slow → green fast), with corner numbers +
+per-corner speed labels (`detectCorners` + `speedAtDistance`), 🚦 stop flags, and start/finish;
+a **corner & straight** breakdown (top straight speed, slowest corner, avg corner, per-corner
+speed/turn/sector); per-sector time + speed (avg/max); an ideal/theoretical-best lap with
+time-on-the-table; a speed-vs-distance profile; stop records (clustered near-stationary fixes
+attributed to nearby lights); and a lap-by-lap comparison table of per-sector deltas (green =
+this lap faster, red = slower). Sector colours reuse `classifySector`'s purple/green/yellow.
 
 ### Conformance / DSQ
 

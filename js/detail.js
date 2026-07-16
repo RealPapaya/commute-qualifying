@@ -1,33 +1,86 @@
-// Post-run DETAIL analysis — a deep, professional telemetry sheet that opens
-// from the summary card. Everything above `renderDetail` is pure (no DOM), so
-// the analysis imports straight into `node --test`.
+// Post-run DETAIL analysis — a deep telemetry sheet that opens from the summary
+// card, in the same white-surface / black-text F1 language as the card itself.
+// Everything above `renderDetail` is pure (no DOM), so the analysis imports
+// straight into `node --test`.
 //
-// The detail sheet answers four questions the summary card can't:
-//   1. How fast was each sector, and where did the lap actually spend its time?
-//   2. Where did the driver stop (lights, junctions), and for how long?
-//   3. Against every previous lap: which sectors got faster, which got slower?
-//   4. What is the theoretical best (ideal lap) and how much time is on the table?
+// It answers what the summary card can't:
+//   1. A speed map of the track: where you were fast (green) or slow (red),
+//      each corner's speed, the straights' top speed, and where you stopped.
+//   2. Per-sector time + speed, classified purple/green/yellow like the board.
+//   3. The ideal (theoretical-best) lap and how much time is on the table.
+//   4. Lap-by-lap: which sectors got faster, which got slower.
 //
 // The raw material is `record.actualTrace`. New laps store timestamped fixes as
-// [lat, lng, t]; older laps stored only [lat, lng]. Speed profiles and stops
-// need the timestamps, so those views degrade gracefully to "unavailable" for
-// legacy laps, while the sector/comparison analysis (derived from sectorTimes
-// and the route geometry) always works.
+// [lat, lng, t]; older laps stored only [lat, lng]. Speed/stops need the
+// timestamps, so those views degrade gracefully for legacy laps.
 
 import { haversine, cumulativeDistances, projectOnRoute, pointAtDistance } from './geo.js';
-import { classifySector, fmtTime, fmtDelta } from './timing.js';
+import { classifySector, fmtTime } from './timing.js';
 import { fmtLap } from './summary.js';
+import { computeProjection, detectCorners } from './trackDiagram.js';
+import { getLanguage } from './i18n.js';
 
-// A GPS segment slower than this is treated as "stopped" (≈2.9 km/h — covers the
-// creep at a red light without flagging a slow crawl as a full stop).
-const STOP_SPEED_MPS = 0.8;
-// A stop must last at least this long to be reported (filters a momentary GPS dip).
-const STOP_MIN_MS = 3000;
-// A trace segment faster than this is GPS noise, not a real speed; excluded from
-// max-speed so a single bad fix can't invent a 300 km/h peak.
-const NOISE_MAX_MPS = 60;
-// A stop is attributed to a light when the nearest light is within this radius.
-const LIGHT_NEAR_M = 45;
+const STOP_SPEED_MPS = 0.8;   // below this a leg counts as "stopped" (~2.9 km/h)
+const STOP_MIN_MS = 3000;     // a stop must last this long to be reported
+const NOISE_MAX_MPS = 60;     // faster than this is GPS noise, excluded from maxima
+const LIGHT_NEAR_M = 45;      // a stop is attributed to a light within this radius
+
+// ---- localisation ----
+// Single language at a time, driven by the app's setting — never both at once.
+const STR = {
+  en: {
+    telemetry: 'TELEMETRY', sim: 'SIM', lapTime: 'LAP TIME',
+    avgSpeed: 'AVG SPEED', topSpeed: 'TOP SPEED', movingAvg: 'MOVING AVG',
+    stopsTile: 'STOPS', stoppedTile: 'STOPPED', conformance: 'CONFORMANCE',
+    sectors: 'sectors', kmh: 'km/h',
+    speedMap: 'SPEED MAP', speedMapHint: 'Coloured by your speed — green fast, red slow. 🚦 = stop.',
+    slow: 'SLOW', fast: 'FAST',
+    cornerSpeeds: 'CORNER & STRAIGHT SPEED', topStraight: 'Top straight', slowestCorner: 'Slowest corner', avgCorner: 'Avg corner',
+    corner: 'Corner', straightLbl: 'straight', turn: 'turn',
+    sectorAnalysis: 'SECTOR ANALYSIS', legPurple: 'new best', legGreen: 'session best', legYellow: 'slower',
+    best: 'BEST', first: 'FIRST', avg: 'avg', max: 'max', ofLap: 'of lap',
+    idealLap: 'IDEAL LAP', idealSub: 'Sum of your best-ever sectors.', thisLapIs: 'This lap', toFind: 'to find',
+    speedProfile: 'SPEED PROFILE', start: 'START', finish: 'FINISH',
+    stops: 'STOPS', noStops: 'No stops — a clean, flowing lap.',
+    noTelemetry: 'This lap has no per-point timing — speed and stops are unavailable. New laps record it automatically.',
+    stopSummary: (n, dur, pct) => `${n} stop${n === 1 ? '' : 's'}, ${dur} total (${pct}% of the lap)`,
+    light: 'Light', segment: 'segment', fromStart: 'from start', ofDist: 'of lap',
+    lapByLap: 'LAP BY LAP', thisLap: 'THIS', total: 'TOTAL',
+    tableNote: 'Gap of this lap vs that lap: green − = this lap faster, red + = slower.',
+    firstLap: 'First clean lap on this route — future laps compare here.',
+    personalBest: 'PERSONAL BEST', vsPb: 'vs PB',
+    footer: 'Commute Qualifying · detailed telemetry',
+    dsqConf: 'conformance',
+  },
+  zh: {
+    telemetry: '詳細數據', sim: '模擬', lapTime: '單圈時間',
+    avgSpeed: '平均速度', topSpeed: '最高速度', movingAvg: '行進均速',
+    stopsTile: '停等次數', stoppedTile: '停等時間', conformance: '符合度',
+    sectors: '賽段', kmh: 'km/h',
+    speedMap: '速度地圖', speedMapHint: '依速度上色：綠快、紅慢。🚦＝停等。',
+    slow: '慢', fast: '快',
+    cornerSpeeds: '彎道與直線速度', topStraight: '直線最高速', slowestCorner: '最慢彎', avgCorner: '彎道平均',
+    corner: '彎道', straightLbl: '直線', turn: '轉角',
+    sectorAnalysis: '分段分析', legPurple: '新最速', legGreen: '時段最速', legYellow: '較慢',
+    best: '最速', first: '首圈', avg: '均速', max: '最高', ofLap: '佔全程',
+    idealLap: '理論最速圈', idealSub: '由每段的歷史最速拼成。', thisLapIs: '本圈', toFind: '可再進步',
+    speedProfile: '速度曲線', start: '起點', finish: '終點',
+    stops: '停等紀錄', noStops: '全程沒有停等 — 一氣呵成。',
+    noTelemetry: '此圈沒有逐點時間資料，無法分析速度與停等。之後的新紀錄會自動記錄。',
+    stopSummary: (n, dur, pct) => `共 ${n} 次停等，合計 ${dur}（占全程 ${pct}%）`,
+    light: '紅綠燈', segment: '路段', fromStart: '距起點', ofDist: '賽程',
+    lapByLap: '逐圈比較', thisLap: '本圈', total: '總計',
+    tableNote: '本圈相對於該圈的差距：綠色− 表示本圈較快，紅色＋ 表示較慢。',
+    firstLap: '這條路線的第一筆有效紀錄，之後再跑就能在這裡比較每一段的快慢。',
+    personalBest: '個人最佳', vsPb: '對比最佳',
+    footer: '通勤排位賽 · 詳細遙測',
+    dsqConf: '符合度',
+  },
+};
+function L(key) {
+  const lang = getLanguage() === 'zh' ? 'zh' : 'en';
+  return STR[lang][key] ?? STR.en[key] ?? key;
+}
 
 // ---- small formatters ----
 
@@ -36,13 +89,11 @@ export function fmtSpeed(kmh) {
   return kmh.toFixed(1);
 }
 
-// "1.2 km" / "340 m" — human distance.
 export function fmtDist(m) {
   if (m == null || !Number.isFinite(m)) return '--';
   return m >= 1000 ? `${(m / 1000).toFixed(2)} km` : `${Math.round(m)} m`;
 }
 
-// "12.4 s" / "1:07" — a stopped/elapsed duration in the friendliest unit.
 export function fmtDuration(ms) {
   if (ms == null || !Number.isFinite(ms)) return '--';
   const s = ms / 1000;
@@ -55,8 +106,6 @@ const mps2kmh = mps => mps * 3.6;
 
 // ---- geometry ----
 
-// The N+1 sectors as distance spans along the route. `sectorBoundaries` are
-// meters-from-start (exclusive of 0 and total); the last sector runs to `total`.
 export function sectorSpans(route) {
   const cum = route.cum ?? cumulativeDistances(route.points);
   const total = cum.at(-1) ?? 0;
@@ -69,17 +118,13 @@ export function sectorSpans(route) {
   return spans;
 }
 
-// Does the trace carry per-fix timestamps? New laps do ([lat,lng,t]); legacy
-// laps don't ([lat,lng]). Requires at least two timed points to mean anything.
 export function traceHasTime(trace) {
   return Array.isArray(trace) && trace.length >= 2 &&
     trace.every(p => Array.isArray(p) && p.length >= 3 && Number.isFinite(p[2]));
 }
 
-// Per-segment speed samples along a timestamped trace. Each sample is the leg
-// between two consecutive fixes: its midpoint progress along the route, its
-// speed, and how long/far it took. Off-route fixes still contribute distance
-// (they were still driving), projected to their nearest point on the route.
+// Per-segment speed samples along a timestamped trace: midpoint progress, speed,
+// duration and distance for the leg between two consecutive fixes.
 export function computeSpeedSamples(trace, points, cum) {
   if (!traceHasTime(trace) || !points || points.length < 2) return [];
   const projected = trace.map(p => {
@@ -101,8 +146,6 @@ export function computeSpeedSamples(trace, points, cum) {
   return samples;
 }
 
-// Roll speed samples up per sector: average (distance/time, so it matches the
-// sector split) and a noise-filtered maximum.
 export function sectorSpeed(samples, span) {
   let dist = 0, time = 0, max = 0, hasMax = false;
   for (const s of samples) {
@@ -117,23 +160,30 @@ export function sectorSpeed(samples, span) {
   };
 }
 
-// Clusters of consecutive near-stationary fixes, each lasting at least
-// STOP_MIN_MS. Returns { atM (progress), point, durationM s, tStart } per stop.
+// Average speed (km/h) around a distance along the route — for corner speeds.
+export function speedAtDistance(samples, d, windowM = 30) {
+  if (!samples.length || d == null) return null;
+  let sum = 0, w = 0, nearest = null, nd = Infinity;
+  for (const s of samples) {
+    if (s.atM == null || s.speedMps > NOISE_MAX_MPS) continue;
+    const dist = Math.abs(s.atM - d);
+    if (dist < nd) { nd = dist; nearest = s; }
+    if (dist <= windowM) { sum += s.speedMps; w++; }
+  }
+  const mps = w ? sum / w : (nearest ? nearest.speedMps : null);
+  return mps == null ? null : mps2kmh(mps);
+}
+
 export function detectStops(trace, points, cum,
                             { stopSpeed = STOP_SPEED_MPS, minMs = STOP_MIN_MS } = {}) {
   if (!traceHasTime(trace)) return [];
   const stops = [];
-  let run = null;   // { startIdx, endIdx, durationMs }
+  let run = null;
   const flush = () => {
     if (run && run.durationMs >= minMs) {
       const p = trace[run.startIdx];
       const pr = points && points.length >= 2 ? projectOnRoute([p[0], p[1]], points, cum) : null;
-      stops.push({
-        atM: pr ? pr.progress : null,
-        point: [p[0], p[1]],
-        durationMs: run.durationMs,
-        tStart: p[2],
-      });
+      stops.push({ atM: pr ? pr.progress : null, point: [p[0], p[1]], durationMs: run.durationMs, tStart: p[2] });
     }
     run = null;
   };
@@ -142,8 +192,7 @@ export function detectStops(trace, points, cum,
     const dtMs = b[2] - a[2];
     if (!(dtMs > 0)) continue;
     const distM = haversine([a[0], a[1]], [b[0], b[1]]);
-    const stopped = distM / (dtMs / 1000) < stopSpeed;
-    if (stopped) {
+    if (distM / (dtMs / 1000) < stopSpeed) {
       if (!run) run = { startIdx: i - 1, endIdx: i, durationMs: 0 };
       run.endIdx = i;
       run.durationMs += dtMs;
@@ -155,7 +204,6 @@ export function detectStops(trace, points, cum,
   return stops;
 }
 
-// Nearest traffic light to a point, and its (1-based) index, if within radiusM.
 function nearestLight(point, lights, radiusM = LIGHT_NEAR_M) {
   if (!Array.isArray(lights) || !lights.length) return null;
   let best = null;
@@ -168,9 +216,6 @@ function nearestLight(point, lights, radiusM = LIGHT_NEAR_M) {
 
 // ---- the full analysis ----
 
-// Bests reference across comparable runs, computed EXCLUDING `record` — so a
-// sector is "purple" only when this lap beat every *previous* lap, matching how
-// the live board classifies before the run is merged into the bests.
 function bestsExcluding(comparable, record, sectorCount) {
   const others = comparable.filter(r => r.id !== record.id);
   const sectorBest = (list, i) => {
@@ -183,12 +228,9 @@ function bestsExcluding(comparable, record, sectorCount) {
     allSectors: (i) => sectorBest(others, i),
     sessionSectors: (i) => sectorBest(today, i),
     allTotal: (() => { const ts = others.map(r => r.totalTime).filter(t => t != null); return ts.length ? Math.min(...ts) : null; })(),
-    sessionTotal: (() => { const ts = today.map(r => r.totalTime).filter(t => t != null); return ts.length ? Math.min(...ts) : null; })(),
   };
 }
 
-// Build the entire detail model. `record` is the just-finished lap; `runs` is
-// every stored run for the route (already includes `record`).
 export function buildDetailData(route, record, runs) {
   const cum = route.cum ?? cumulativeDistances(route.points);
   const totalDistanceM = cum.at(-1) ?? 0;
@@ -204,82 +246,75 @@ export function buildDetailData(route, record, runs) {
   const samples = hasTelemetry ? computeSpeedSamples(trace, route.points, cum) : [];
   const stops = hasTelemetry ? detectStops(trace, route.points, cum) : [];
 
-  // Attribute each stop to its sector + nearest light, and tag its distance.
   const stopsDetailed = stops.map(s => {
     const span = spans.find(sp => s.atM != null && s.atM >= sp.startM && s.atM < sp.endM) ?? spans[spans.length - 1];
-    return {
-      ...s,
-      sectorIndex: span ? span.index : null,
-      light: nearestLight(s.point, route.lights),
-    };
+    return { ...s, sectorIndex: span ? span.index : null, light: nearestLight(s.point, route.lights) };
   });
 
-  // Per-sector breakdown.
   const sectors = spans.map((span, i) => {
     const timeMs = record.sectorTimes?.[i] ?? null;
     const prevAll = bests.allSectors(i);
     const prevSession = bests.sessionSectors(i);
     const color = timeMs != null ? classifySector(timeMs, prevAll, prevSession) : null;
     const sp = hasTelemetry ? sectorSpeed(samples, span) : { avgKmh: null, maxKmh: null };
-    // Fallback average speed straight from the sector split (always available).
     const splitAvgKmh = timeMs > 0 ? mps2kmh(span.distanceM / (timeMs / 1000)) : null;
     const sectorStops = stopsDetailed.filter(s => s.sectorIndex === i);
     return {
-      index: i,
-      label: `S${i + 1}`,
-      distanceM: span.distanceM,
+      index: i, label: `S${i + 1}`, distanceM: span.distanceM,
       pctOfLap: totalDistanceM > 0 ? span.distanceM / totalDistanceM : 0,
-      timeMs,
-      color,
-      bestMs: prevAll != null ? Math.min(prevAll, timeMs ?? Infinity) : timeMs,
+      timeMs, color,
       prevBestMs: prevAll,
       deltaVsBestMs: prevAll != null && timeMs != null ? timeMs - prevAll : null,
-      isRecord: color === 'purple' && prevAll != null,        // beat a previous best
-      isFirst: prevAll == null,                                // no prior lap to compare
+      isRecord: color === 'purple' && prevAll != null,
+      isFirst: prevAll == null,
       avgKmh: sp.avgKmh ?? splitAvgKmh,
-      splitAvgKmh,
-      maxKmh: sp.maxKmh,
-      stops: sectorStops,
-      stopCount: sectorStops.length,
+      splitAvgKmh, maxKmh: sp.maxKmh,
+      stops: sectorStops, stopCount: sectorStops.length,
       stoppedMs: sectorStops.reduce((a, s) => a + s.durationMs, 0),
     };
   });
 
-  // Ideal / theoretical-best lap: sum of each sector's best-ever time (incl this
-  // lap). Time lost is how far this lap sits above that ceiling.
+  // Corners (from the same detector the circuit diagram uses) + their speeds.
+  const corners = detectCorners(route.points).map(c => {
+    const span = spans.find(sp => c.distance >= sp.startM && c.distance < sp.endM) ?? spans[spans.length - 1];
+    return {
+      number: c.number, distanceM: c.distance, turnDeg: Math.abs(c.turn),
+      sectorIndex: span ? span.index : null,
+      speedKmh: hasTelemetry ? speedAtDistance(samples, c.distance) : null,
+    };
+  });
+  const cornerSpeeds = corners.map(c => c.speedKmh).filter(v => v != null);
+  const slowest = corners.reduce((m, c) => (c.speedKmh != null && (m == null || c.speedKmh < m.speedKmh)) ? c : m, null);
+
   const idealSectors = spans.map((_, i) => {
-    const mine = record.sectorTimes?.[i];
-    const prev = bests.allSectors(i);
+    const mine = record.sectorTimes?.[i], prev = bests.allSectors(i);
     const vals = [mine, prev].filter(t => t != null);
     return vals.length ? Math.min(...vals) : null;
   });
-  const idealTotalMs = idealSectors.every(t => t != null)
-    ? idealSectors.reduce((a, t) => a + t, 0) : null;
-  const timeLostVsIdealMs = idealTotalMs != null && record.totalTime != null
-    ? record.totalTime - idealTotalMs : null;
+  const idealTotalMs = idealSectors.every(t => t != null) ? idealSectors.reduce((a, t) => a + t, 0) : null;
+  const timeLostVsIdealMs = idealTotalMs != null && record.totalTime != null ? record.totalTime - idealTotalMs : null;
 
-  // Overall speed stats.
   const totalStoppedMs = stopsDetailed.reduce((a, s) => a + s.durationMs, 0);
   const movingMs = record.totalTime != null ? record.totalTime - totalStoppedMs : null;
+  const maxKmh = sectors.reduce((m, s) => s.maxKmh != null && s.maxKmh > m ? s.maxKmh : m, 0) || null;
   const overall = {
-    distanceM: totalDistanceM,
-    totalTimeMs: record.totalTime,
+    distanceM: totalDistanceM, totalTimeMs: record.totalTime,
     avgKmh: record.totalTime > 0 ? mps2kmh(totalDistanceM / (record.totalTime / 1000)) : null,
     movingAvgKmh: hasTelemetry && movingMs > 0 ? mps2kmh(totalDistanceM / (movingMs / 1000)) : null,
-    maxKmh: sectors.reduce((m, s) => s.maxKmh != null && s.maxKmh > m ? s.maxKmh : m, 0) || null,
-    stopCount: stopsDetailed.length,
-    totalStoppedMs,
+    maxKmh, stopCount: stopsDetailed.length, totalStoppedMs,
   };
 
-  // Multi-lap comparison: previous laps ranked most-recent-first, each with a
-  // per-sector delta vs this lap (negative = this lap was faster there).
+  const speedStats = {
+    topStraightKmh: maxKmh,
+    avgCornerKmh: cornerSpeeds.length ? cornerSpeeds.reduce((a, b) => a + b, 0) / cornerSpeeds.length : null,
+    slowestCornerKmh: slowest ? slowest.speedKmh : null,
+    slowestCornerNumber: slowest ? slowest.number : null,
+  };
+
   const others = comparable.filter(r => r.id !== record.id)
     .slice().sort((a, b) => new Date(b.date) - new Date(a.date));
   const compare = others.map(r => ({
-    id: r.id,
-    date: r.date,
-    simulated: r.simulated === true,
-    totalTime: r.totalTime,
+    id: r.id, date: r.date, simulated: r.simulated === true, totalTime: r.totalTime,
     totalDeltaMs: r.totalTime != null && record.totalTime != null ? record.totalTime - r.totalTime : null,
     sectorTimes: spans.map((_, i) => r.sectorTimes?.[i] ?? null),
     sectorDeltas: spans.map((_, i) => {
@@ -288,32 +323,20 @@ export function buildDetailData(route, record, runs) {
     }),
   }));
 
-  // Rank of this lap among all comparable laps (1 = fastest).
   const rank = comparable.filter(r => r.totalTime != null && record.totalTime != null &&
     r.totalTime < record.totalTime).length + 1;
 
   return {
-    route,
-    record,
-    hasTelemetry,
-    sectorCount: n,
-    sectors,
-    overall,
-    stops: stopsDetailed,
+    route: { ...route, cum }, record, hasTelemetry, samples, sectorCount: n,
+    sectors, corners, speedStats, overall, stops: stopsDetailed,
     ideal: { sectors: idealSectors, totalMs: idealTotalMs, timeLostVsIdealMs },
-    compare,
-    prev: compare[0] ?? null,
-    rank,
-    lapCount: comparable.length,
-    disqualified: record.disqualified === true,
-    conformance: record.conformance,
-    simulated: record.simulated === true,
-    date: record.date,
+    compare, rank, lapCount: comparable.length,
+    disqualified: record.disqualified === true, conformance: record.conformance,
+    simulated: record.simulated === true, date: record.date,
     isPB: !record.disqualified && (bests.allTotal == null ||
       (record.totalTime != null && record.totalTime <= bests.allTotal)),
     prevBestTotalMs: bests.allTotal,
-    deltaVsBestTotalMs: bests.allTotal != null && record.totalTime != null
-      ? record.totalTime - bests.allTotal : null,
+    deltaVsBestTotalMs: bests.allTotal != null && record.totalTime != null ? record.totalTime - bests.allTotal : null,
   };
 }
 
@@ -333,65 +356,120 @@ function shortDateTime(iso) {
   return `${d.getDate()} ${mon} ${d.getFullYear()} · ${hh}:${mm}`;
 }
 
-// A signed delta with an explicit faster/slower sign, for cells that compare
-// two times. Returns { text, cls }.
 function deltaCell(ms) {
   if (ms == null) return { text: '—', cls: 'flat' };
   if (Math.abs(ms) < 0.5) return { text: '±0.000', cls: 'flat' };
   const faster = ms < 0;
-  return {
-    text: `${faster ? '−' : '+'}${(Math.abs(ms) / 1000).toFixed(3)}`,
-    cls: faster ? 'faster' : 'slower',
-  };
+  return { text: `${faster ? '−' : '+'}${(Math.abs(ms) / 1000).toFixed(3)}`, cls: faster ? 'faster' : 'slower' };
 }
 
-// A horizontal bar (0..1) for the sector time-share / speed visualisations.
-function bar(fraction, cls) {
-  const pct = Math.max(0, Math.min(1, fraction || 0)) * 100;
-  return `<span class="dt-bar ${cls}"><span class="dt-bar-fill" style="width:${pct.toFixed(1)}%"></span></span>`;
+// Red (slow) → yellow → green (fast). `frac` is 0..1.
+function speedColor(frac) {
+  const f = Math.max(0, Math.min(1, frac));
+  const red = [225, 6, 0], yellow = [245, 190, 30], green = [18, 165, 63];
+  const lerp = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
+  const rgb = f < 0.5 ? lerp(red, yellow, f / 0.5) : lerp(yellow, green, (f - 0.5) / 0.5);
+  return `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
 }
 
-// Speed profile: an SVG area chart of speed vs distance along the lap, with
-// sector-boundary gridlines and stop markers.
+// The hero: a stylised track drawn from the route, each segment coloured by the
+// speed driven there, with corner-speed labels, stop flags and start/finish.
+function speedMapSvg(data) {
+  const points = data.route.points || [];
+  if (points.length < 2) return '';
+  const cum = data.route.cum;
+  const W = 1000, H = 620, PAD = 78;
+  const { project } = computeProjection(points, { width: W, height: H, pad: PAD });
+  const xy = points.map(project);
+
+  // Per-segment speed: telemetry samples if present, else the sector average.
+  const segSpeed = [];
+  for (let i = 0; i < points.length - 1; i++) {
+    const mid = (cum[i] + cum[i + 1]) / 2;
+    let kmh = data.hasTelemetry ? speedAtDistance(data.samples, mid, Math.max(30, cum[i + 1] - cum[i])) : null;
+    if (kmh == null) {
+      const sec = data.sectors.find((_, si) => mid >= sectorSpans(data.route)[si].startM &&
+        mid < sectorSpans(data.route)[si].endM);
+      kmh = sec ? (sec.avgKmh ?? sec.splitAvgKmh) : null;
+    }
+    segSpeed.push(kmh);
+  }
+  const known = segSpeed.filter(v => v != null);
+  const lo = known.length ? Math.min(...known) : 0;
+  const hi = known.length ? Math.max(...known) : 1;
+  const norm = v => (hi - lo) < 1e-6 ? 0.5 : (v - lo) / (hi - lo);
+
+  // casing under everything
+  let svg = `<path d="${xy.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ')}"
+    fill="none" stroke="#d7d7dd" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>`;
+  // each segment in its speed colour
+  for (let i = 0; i < points.length - 1; i++) {
+    const [x1, y1] = xy[i], [x2, y2] = xy[i + 1];
+    const col = segSpeed[i] != null ? speedColor(norm(segSpeed[i])) : '#b8b8c0';
+    svg += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"
+      stroke="${col}" stroke-width="13" stroke-linecap="round"/>`;
+  }
+
+  // start / finish tick
+  const [sx, sy] = xy[0], [sx2, sy2] = xy[1];
+  const sl = Math.hypot(sx2 - sx, sy2 - sy) || 1;
+  const spx = -(sy2 - sy) / sl, spy = (sx2 - sx) / sl;
+  svg += `<line x1="${(sx - spx * 26).toFixed(1)}" y1="${(sy - spy * 26).toFixed(1)}"
+    x2="${(sx + spx * 26).toFixed(1)}" y2="${(sy + spy * 26).toFixed(1)}" stroke="#15151e" stroke-width="7"/>`;
+
+  // corner markers + speed labels
+  for (const c of detectCorners(points)) {
+    const [cx, cy] = project(c.point);
+    const ox = cx + c.outward[0] * 40, oy = cy + c.outward[1] * 40;
+    svg += `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="15" fill="#fff" stroke="#15151e" stroke-width="3"/>`;
+    svg += `<text x="${cx.toFixed(1)}" y="${cy.toFixed(1)}" class="dt-map-cnum" text-anchor="middle" dominant-baseline="central">${c.number}</text>`;
+    const spd = data.hasTelemetry ? speedAtDistance(data.samples, c.distance) : null;
+    if (spd != null) {
+      svg += `<text x="${ox.toFixed(1)}" y="${oy.toFixed(1)}" class="dt-map-cspd" text-anchor="middle" dominant-baseline="central">${Math.round(spd)}</text>`;
+    }
+  }
+
+  // stop flags
+  for (const s of data.stops) {
+    if (s.atM == null) continue;
+    const [x, y] = project(pointAtDistance(points, cum, s.atM));
+    svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="17" fill="#15151e"/>`;
+    svg += `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="20">🚦</text>`;
+  }
+
+  return `<svg class="dt-map-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Speed map">${svg}</svg>`;
+}
+
 function speedProfileSvg(data) {
-  const samples = data.hasTelemetry
-    ? computeSpeedSamples(data.record.actualTrace, data.route.points,
-        data.route.cum ?? cumulativeDistances(data.route.points))
-    : [];
   const total = data.overall.distanceM || 1;
-  const pts = samples.filter(s => s.atM != null && s.speedMps <= NOISE_MAX_MPS)
-    .map(s => ({ x: s.atM / total, v: mps2kmh(s.speedMps) }))
-    .sort((a, b) => a.x - b.x);
+  const pts = data.samples.filter(s => s.atM != null && s.speedMps <= NOISE_MAX_MPS)
+    .map(s => ({ x: s.atM / total, v: mps2kmh(s.speedMps) })).sort((a, b) => a.x - b.x);
   if (pts.length < 2) return '';
-  const W = 1000, H = 260, padB = 4;
+  const W = 1000, H = 240, padB = 4;
   const vmax = Math.max(20, ...pts.map(p => p.v)) * 1.1;
-  const X = x => x * W;
-  const Y = v => H - padB - (v / vmax) * (H - padB);
+  const X = x => x * W, Y = v => H - padB - (v / vmax) * (H - padB);
   const line = pts.map((p, i) => `${i ? 'L' : 'M'}${X(p.x).toFixed(1)},${Y(p.v).toFixed(1)}`).join(' ');
   const area = `${line} L${X(pts.at(-1).x).toFixed(1)},${H} L${X(pts[0].x).toFixed(1)},${H} Z`;
-
-  // sector boundary gridlines
-  const spans = sectorSpans({ ...data.route, cum: data.route.cum ?? cumulativeDistances(data.route.points) });
+  const spans = sectorSpans(data.route);
   const grid = spans.slice(1).map(sp =>
     `<line x1="${X(sp.startM / total).toFixed(1)}" y1="0" x2="${X(sp.startM / total).toFixed(1)}" y2="${H}" class="dt-grid"/>`).join('');
   const stopMarks = data.stops.filter(s => s.atM != null).map(s =>
     `<line x1="${X(s.atM / total).toFixed(1)}" y1="0" x2="${X(s.atM / total).toFixed(1)}" y2="${H}" class="dt-stopmark"/>`).join('');
-
   return `<svg class="dt-profile-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Speed profile">
-    ${grid}
-    <path d="${area}" class="dt-profile-area"/>
-    <path d="${line}" class="dt-profile-line" fill="none"/>
-    ${stopMarks}
-  </svg>`;
+    ${grid}<path d="${area}" class="dt-profile-area"/><path d="${line}" class="dt-profile-line" fill="none"/>${stopMarks}</svg>`;
 }
 
-function sectorRow(s, maxTime, maxSpeed) {
-  const cls = s.color ? `dt-${s.color}` : 'dt-none';
+function bar(fraction, cls) {
+  const pct = Math.max(0, Math.min(1, fraction || 0)) * 100;
+  return `<span class="dt-mbar"><span class="dt-mbar-fill ${cls}" style="width:${pct.toFixed(1)}%"></span></span>`;
+}
+
+function sectorRow(s, maxTime) {
+  const cls = s.color ? `dt-${s.color}` : '';
   const d = deltaCell(s.deltaVsBestMs);
-  const tag = s.isFirst ? '<span class="dt-tag dt-tag-new">FIRST</span>'
-    : s.isRecord ? '<span class="dt-tag dt-tag-pb">BEST</span>' : '';
-  const stopBadge = s.stopCount
-    ? `<span class="dt-stopbadge" title="停等">🛑 ${s.stopCount} · ${fmtDuration(s.stoppedMs)}</span>` : '';
+  const tag = s.isFirst ? `<span class="dt-tag dt-tag-new">${L('first')}</span>`
+    : s.isRecord ? `<span class="dt-tag dt-tag-pb">${L('best')}</span>` : '';
+  const stopBadge = s.stopCount ? `<span class="dt-stopbadge">🚦 ${s.stopCount} · ${fmtDuration(s.stoppedMs)}</span>` : '';
   return `<div class="dt-srow ${cls}">
     <div class="dt-srow-head">
       <span class="dt-slabel">${esc(s.label)} ${tag}</span>
@@ -400,156 +478,142 @@ function sectorRow(s, maxTime, maxSpeed) {
     </div>
     <div class="dt-srow-bar">${bar(maxTime ? (s.timeMs || 0) / maxTime : 0, `fill-${s.color || 'none'}`)}</div>
     <div class="dt-srow-meta">
-      <span><b>${fmtSpeed(s.avgKmh)}</b> <i>km/h avg</i></span>
-      <span><b>${fmtSpeed(s.maxKmh)}</b> <i>max</i></span>
-      <span><b>${fmtDist(s.distanceM)}</b> <i>${(s.pctOfLap * 100).toFixed(0)}% 賽段</i></span>
+      <span><b>${fmtSpeed(s.avgKmh)}</b> <i>${L('kmh')} ${L('avg')}</i></span>
+      <span><b>${fmtSpeed(s.maxKmh)}</b> <i>${L('max')}</i></span>
+      <span><b>${fmtDist(s.distanceM)}</b> <i>${(s.pctOfLap * 100).toFixed(0)}% ${L('ofLap')}</i></span>
       ${stopBadge}
     </div>
   </div>`;
 }
 
-function comparisonTable(data) {
-  if (!data.compare.length) {
-    return `<p class="dt-empty">這是這條路線的第一筆有效紀錄，之後再跑就能在這裡比較每一段的快慢。<br>
-      <span class="dt-empty-en">First clean lap on this route — future laps compare here.</span></p>`;
-  }
-  const spans = data.sectors;
-  const head = `<tr><th>LAP · 圈</th>${spans.map(s => `<th>${esc(s.label)}</th>`).join('')}<th>TOTAL</th></tr>`;
-  // this lap row
-  const thisRow = `<tr class="dt-row-this">
-    <td class="dt-lapname">THIS · 本圈</td>
-    ${data.sectors.map(s => `<td class="dt-t dt-${s.color || 'none'}">${fmtTime(s.timeMs)}</td>`).join('')}
-    <td class="dt-t dt-total">${fmtTime(data.record.totalTime)}</td>
-  </tr>`;
-  const rows = data.compare.slice(0, 6).map(r => {
-    const dt = deltaCell(r.totalDeltaMs);
-    return `<tr>
-      <td class="dt-lapname">${esc(shortDateTime(r.date))}${r.simulated ? ' <span class="dt-sim">sim</span>' : ''}</td>
-      ${r.sectorDeltas.map(dms => { const c = deltaCell(dms); return `<td class="dt-d ${c.cls}">${c.text}</td>`; }).join('')}
-      <td class="dt-d dt-total ${dt.cls}">${dt.text}</td>
-    </tr>`;
+function cornerSection(data) {
+  if (!data.corners.length) return '';
+  const stat = (label, val) => `<div class="dt-cstat"><div class="dt-cstat-val">${val}<span>${L('kmh')}</span></div><div class="dt-cstat-lbl">${esc(label)}</div></div>`;
+  const stats = `<div class="dt-cstats">
+    ${stat(L('topStraight'), fmtSpeed(data.speedStats.topStraightKmh))}
+    ${stat(L('slowestCorner') + (data.speedStats.slowestCornerNumber ? ` T${data.speedStats.slowestCornerNumber}` : ''), fmtSpeed(data.speedStats.slowestCornerKmh))}
+    ${stat(L('avgCorner'), fmtSpeed(data.speedStats.avgCornerKmh))}
+  </div>`;
+  const rows = data.corners.map(c => {
+    const slow = c.number === data.speedStats.slowestCornerNumber;
+    return `<div class="dt-corner${slow ? ' dt-corner-slow' : ''}">
+      <span class="dt-corner-n">T${c.number}</span>
+      <span class="dt-corner-spd">${fmtSpeed(c.speedKmh)} <i>${L('kmh')}</i></span>
+      <span class="dt-corner-meta">${Math.round(c.turnDeg)}° ${L('turn')} · S${(c.sectorIndex ?? 0) + 1} · ${fmtDist(c.distanceM)}</span>
+    </div>`;
   }).join('');
-  return `<div class="dt-table-scroll"><table class="dt-table">
-    <thead>${head}</thead>
-    <tbody>${thisRow}${rows}</tbody>
-  </table></div>
-  <p class="dt-tablenote">數字為<strong>本圈相對於該圈</strong>的差距：<span class="faster">綠色−</span> 表示本圈較快，<span class="slower">紅色＋</span> 表示較慢。</p>`;
+  return stats + `<div class="dt-corners">${rows}</div>`;
 }
 
 function stopsSection(data) {
-  if (!data.hasTelemetry) {
-    return `<p class="dt-empty">這筆紀錄沒有逐點時間資料，無法重建停等點。<br>
-      <span class="dt-empty-en">This lap predates telemetry capture — stop detection unavailable. New laps record it automatically.</span></p>`;
-  }
-  if (!data.stops.length) {
-    return `<p class="dt-clean">🟢 全程沒有偵測到停等 — 一氣呵成。<br>
-      <span class="dt-empty-en">No stops detected — a clean, flowing lap.</span></p>`;
-  }
+  if (!data.hasTelemetry) return `<p class="dt-empty">${L('noTelemetry')}</p>`;
+  if (!data.stops.length) return `<p class="dt-clean">🟢 ${L('noStops')}</p>`;
   const total = data.overall.distanceM || 1;
+  const pct = data.record.totalTime ? (data.overall.totalStoppedMs / data.record.totalTime * 100).toFixed(0) : '0';
   const items = data.stops.map((s, i) => {
-    const where = s.light ? `🚦 紅綠燈 #${s.light.index}` : (s.sectorIndex != null ? `S${s.sectorIndex + 1} 路段` : '路段');
+    const where = s.light ? `🚦 ${L('light')} #${s.light.index}`
+      : (s.sectorIndex != null ? `S${s.sectorIndex + 1} ${L('segment')}` : L('segment'));
     return `<div class="dt-stop">
       <span class="dt-stop-n">${i + 1}</span>
       <div class="dt-stop-body">
         <div class="dt-stop-top"><span class="dt-stop-where">${where}</span><span class="dt-stop-dur">${fmtDuration(s.durationMs)}</span></div>
-        <div class="dt-stop-sub">距起點 ${fmtDist(s.atM)} · ${((s.atM ?? 0) / total * 100).toFixed(0)}% 賽程</div>
+        <div class="dt-stop-sub">${L('fromStart')} ${fmtDist(s.atM)} · ${((s.atM ?? 0) / total * 100).toFixed(0)}% ${L('ofDist')}</div>
       </div>
     </div>`;
   }).join('');
-  return `<div class="dt-stop-summary">共 <b>${data.overall.stopCount}</b> 次停等，合計 <b>${fmtDuration(data.overall.totalStoppedMs)}</b>
-    （占全程 ${data.record.totalTime ? (data.overall.totalStoppedMs / data.record.totalTime * 100).toFixed(0) : '0'}%）</div>
+  return `<div class="dt-stop-summary">${esc(L('stopSummary')(data.overall.stopCount, fmtDuration(data.overall.totalStoppedMs), pct))}</div>
     <div class="dt-stops">${items}</div>`;
+}
+
+function comparisonTable(data) {
+  if (!data.compare.length) return `<p class="dt-empty">${L('firstLap')}</p>`;
+  const head = `<tr><th>${L('lapByLap').split(' ')[0]}</th>${data.sectors.map(s => `<th>${esc(s.label)}</th>`).join('')}<th>${L('total')}</th></tr>`;
+  const thisRow = `<tr class="dt-row-this">
+    <td class="dt-lapname">${L('thisLap')}</td>
+    ${data.sectors.map(s => `<td class="dt-t dt-${s.color || 'none'}">${fmtTime(s.timeMs)}</td>`).join('')}
+    <td class="dt-t dt-total">${fmtTime(data.record.totalTime)}</td></tr>`;
+  const rows = data.compare.slice(0, 6).map(r => {
+    const dt = deltaCell(r.totalDeltaMs);
+    return `<tr>
+      <td class="dt-lapname">${esc(shortDateTime(r.date))}${r.simulated ? ` <span class="dt-sim">${L('sim').toLowerCase()}</span>` : ''}</td>
+      ${r.sectorDeltas.map(dms => { const c = deltaCell(dms); return `<td class="dt-d ${c.cls}">${c.text}</td>`; }).join('')}
+      <td class="dt-d dt-total ${dt.cls}">${dt.text}</td></tr>`;
+  }).join('');
+  return `<div class="dt-table-scroll"><table class="dt-table"><thead>${head}</thead><tbody>${thisRow}${rows}</tbody></table></div>
+    <p class="dt-tablenote">${esc(L('tableNote'))}</p>`;
 }
 
 function statTile(value, unit, label) {
   return `<div class="dt-tile">
     <div class="dt-tile-val">${esc(value)}<span class="dt-tile-unit">${esc(unit)}</span></div>
-    <div class="dt-tile-label">${esc(label)}</div>
-  </div>`;
+    <div class="dt-tile-label">${esc(label)}</div></div>`;
 }
 
 export function renderDetail(container, data) {
   const maxTime = Math.max(0, ...data.sectors.map(s => s.timeMs || 0)) || 1;
   const badge = data.disqualified
-    ? `<span class="dt-badge dt-badge-dsq">DSQ · 符合度 ${Math.round((data.conformance ?? 0) * 100)}%</span>`
+    ? `<span class="dt-badge dt-badge-dsq">DSQ · ${L('dsqConf')} ${Math.round((data.conformance ?? 0) * 100)}%</span>`
     : data.isPB
-      ? `<span class="dt-badge dt-badge-pb">PERSONAL BEST · P${data.rank}</span>`
-      : `<span class="dt-badge">P${data.rank} / ${data.lapCount} · ${deltaCell(data.deltaVsBestTotalMs).text} vs PB</span>`;
+      ? `<span class="dt-badge dt-badge-pb">${L('personalBest')} · P${data.rank}</span>`
+      : `<span class="dt-badge">P${data.rank} / ${data.lapCount} · ${deltaCell(data.deltaVsBestTotalMs).text} ${L('vsPb')}</span>`;
 
-  const ideal = data.ideal.totalMs != null
-    ? `<div class="dt-ideal">
-        <div class="dt-ideal-head">
-          <span class="dt-ideal-title">IDEAL LAP · 理論最速圈</span>
-          <span class="dt-ideal-time">${fmtLap(data.ideal.totalMs)}</span>
-        </div>
-        <div class="dt-ideal-sub">
-          由每段的歷史最速拼成。本圈 ${fmtLap(data.record.totalTime)} ·
-          可再進步 <b class="slower">${data.ideal.timeLostVsIdealMs != null ? '+' + (data.ideal.timeLostVsIdealMs / 1000).toFixed(3) : '—'}</b>
-          <span class="dt-empty-en">Sum of your best-ever sectors. Time on the table shown in red.</span>
-        </div>
-      </div>`
-    : '';
+  const ideal = data.ideal.totalMs != null ? `<section class="dt-sec"><div class="dt-ideal">
+      <div class="dt-ideal-head"><span class="dt-ideal-title">${L('idealLap')}</span><span class="dt-ideal-time">${fmtLap(data.ideal.totalMs)}</span></div>
+      <div class="dt-ideal-sub">${L('idealSub')} ${L('thisLapIs')} ${fmtLap(data.record.totalTime)} ·
+        ${L('toFind')} <b class="slower">${data.ideal.timeLostVsIdealMs != null ? '+' + (data.ideal.timeLostVsIdealMs / 1000).toFixed(3) : '—'}</b></div>
+    </div></section>` : '';
 
-  const profile = data.hasTelemetry ? speedProfileSvg(data) : '';
-  const profileSection = profile
-    ? `<section class="dt-sec">
-        <h3 class="dt-h">SPEED PROFILE · 速度曲線</h3>
-        <div class="dt-profile">${profile}
-          <div class="dt-profile-axis"><span>起點 START</span><span>終點 FINISH</span></div>
-        </div>
-      </section>`
-    : `<section class="dt-sec"><h3 class="dt-h">SPEED PROFILE · 速度曲線</h3>
-        <p class="dt-empty">此圈無逐點時間資料，無法繪製速度曲線。<span class="dt-empty-en">Legacy lap — no per-fix timing.</span></p></section>`;
+  const map = speedMapSvg(data);
+  const profile = speedProfileSvg(data);
 
   container.innerHTML = `
     <article class="dt-sheet${data.disqualified ? ' dt-sheet-dsq' : ''}">
       <header class="dt-head">
-        <div class="dt-head-top">
-          <div class="dt-kicker">TELEMETRY · 詳細數據${data.simulated ? ' · SIM' : ''}</div>
-          ${badge}
+        <div class="dt-head-row">
+          <div class="dt-mark">CQ</div>
+          <div class="dt-head-text">
+            <div class="dt-kicker">${L('telemetry')}${data.simulated ? ' · ' + L('sim') : ''}</div>
+            <h2 class="dt-title">${esc(data.route.name || 'UNNAMED ROUTE')}</h2>
+            <div class="dt-subtitle">${esc(shortDateTime(data.date))} · ${data.sectorCount} ${L('sectors')} · ${fmtDist(data.overall.distanceM)}</div>
+          </div>
         </div>
-        <h2 class="dt-title">${esc(data.route.name || 'UNNAMED ROUTE')}</h2>
-        <div class="dt-subtitle">${esc(shortDateTime(data.date))} · ${data.sectorCount} sectors · ${fmtDist(data.overall.distanceM)}</div>
-        <div class="dt-laptime">
-          <span class="dt-laptime-val">${fmtLap(data.record.totalTime)}</span>
-          <span class="dt-laptime-lbl">LAP TIME</span>
+        <div class="dt-laprow">
+          <div class="dt-laptime"><span class="dt-laptime-val">${fmtLap(data.record.totalTime)}</span><span class="dt-laptime-lbl">${L('lapTime')}</span></div>
+          ${badge}
         </div>
       </header>
 
       <section class="dt-tiles">
-        ${statTile(fmtSpeed(data.overall.avgKmh), ' km/h', '平均速度 AVG SPEED')}
-        ${statTile(fmtSpeed(data.overall.maxKmh), ' km/h', '最高速度 TOP SPEED')}
-        ${statTile(data.hasTelemetry ? fmtSpeed(data.overall.movingAvgKmh) : '--', ' km/h', '行進均速 MOVING AVG')}
-        ${statTile(String(data.overall.stopCount), '', '停等次數 STOPS')}
-        ${statTile(fmtDuration(data.overall.totalStoppedMs), '', '停等時間 STOPPED')}
-        ${statTile(Math.round((data.conformance ?? 1) * 100) + '', '%', '符合度 CONFORMANCE')}
+        ${statTile(fmtSpeed(data.overall.avgKmh), ' ' + L('kmh'), L('avgSpeed'))}
+        ${statTile(fmtSpeed(data.overall.maxKmh), ' ' + L('kmh'), L('topSpeed'))}
+        ${statTile(data.hasTelemetry ? fmtSpeed(data.overall.movingAvgKmh) : '--', ' ' + L('kmh'), L('movingAvg'))}
+        ${statTile(String(data.overall.stopCount), '', L('stopsTile'))}
+        ${statTile(fmtDuration(data.overall.totalStoppedMs), '', L('stoppedTile'))}
+        ${statTile(Math.round((data.conformance ?? 1) * 100) + '', '%', L('conformance'))}
       </section>
+
+      ${map ? `<section class="dt-sec"><div class="dt-bar"><span>${L('speedMap')}</span></div>
+        <div class="dt-map">${map}</div>
+        <div class="dt-map-legend"><span>${L('slow')}</span><span class="dt-map-scale"></span><span>${L('fast')}</span></div>
+        <p class="dt-hint">${L('speedMapHint')}</p></section>` : ''}
+
+      ${data.corners.length ? `<section class="dt-sec"><div class="dt-bar"><span>${L('cornerSpeeds')}</span></div>${cornerSection(data)}</section>` : ''}
 
       ${ideal}
 
-      <section class="dt-sec">
-        <h3 class="dt-h">SECTOR ANALYSIS · 分段分析</h3>
-        <div class="dt-legend">
-          <span class="dt-lg dt-purple">紫 新最速</span>
-          <span class="dt-lg dt-green">綠 時段最速</span>
-          <span class="dt-lg dt-yellow">黃 較慢</span>
-        </div>
+      <section class="dt-sec"><div class="dt-bar"><span>${L('sectorAnalysis')}</span></div>
+        <div class="dt-legend"><span class="dt-lg dt-purple">${L('legPurple')}</span><span class="dt-lg dt-green">${L('legGreen')}</span><span class="dt-lg dt-yellow">${L('legYellow')}</span></div>
         <div class="dt-sectors">${data.sectors.map(s => sectorRow(s, maxTime)).join('')}</div>
       </section>
 
-      ${profileSection}
+      ${profile ? `<section class="dt-sec"><div class="dt-bar"><span>${L('speedProfile')}</span></div>
+        <div class="dt-profile">${profile}<div class="dt-profile-axis"><span>${L('start')}</span><span>${L('finish')}</span></div></div></section>` : ''}
 
-      <section class="dt-sec">
-        <h3 class="dt-h">STOPS · 停等紀錄</h3>
-        ${stopsSection(data)}
-      </section>
+      <section class="dt-sec"><div class="dt-bar"><span>${L('stops')}</span></div>${stopsSection(data)}</section>
 
-      <section class="dt-sec">
-        <h3 class="dt-h">LAP-BY-LAP · 逐圈比較</h3>
-        ${comparisonTable(data)}
-      </section>
+      <section class="dt-sec"><div class="dt-bar"><span>${L('lapByLap')}</span></div>${comparisonTable(data)}</section>
 
-      <footer class="dt-foot">Commute Qualifying · 詳細遙測 / detailed telemetry</footer>
+      <footer class="dt-foot">${L('footer')}</footer>
     </article>`;
 }
 
@@ -568,6 +632,12 @@ function ensureWired() {
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && !overlay.hidden) hideDetail();
   });
+  // Re-render in the new language if it changes while the sheet is open.
+  document.addEventListener('languagechange', () => {
+    if (!overlay.hidden && lastArgs) {
+      renderDetail(overlay.querySelector('.dt-host'), buildDetailData(lastArgs.route, lastArgs.record, lastArgs.runs));
+    }
+  });
   wired = true;
 }
 
@@ -579,7 +649,7 @@ export function showDetail(route, record, runs) {
   lastArgs = { route, record, runs };
   renderDetail(host, buildDetailData(route, record, runs));
   overlay.hidden = false;
-  host.scrollTop = 0;
+  overlay.scrollTop = 0;
 }
 
 export function hideDetail() {

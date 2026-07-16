@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { cumulativeDistances } from '../js/geo.js';
 import {
-  sectorSpans, traceHasTime, computeSpeedSamples, sectorSpeed,
+  sectorSpans, traceHasTime, computeSpeedSamples, sectorSpeed, speedAtDistance,
   detectStops, buildDetailData, fmtSpeed, fmtDist, fmtDuration,
 } from '../js/detail.js';
 
@@ -80,6 +80,17 @@ test('sectorSpeed: rolls samples into the right sector', () => {
   const s1 = sectorSpeed(samples, spans[0]);
   assert.ok(s1.avgKmh > 0);
   assert.ok(s1.maxKmh >= s1.avgKmh - 1e-6);
+});
+
+// ---- speedAtDistance ----
+
+test('speedAtDistance: averages samples near a distance, km/h', () => {
+  const trace = [[0, 0, 0], [0, 0.005, 60000], [0, 0.01, 120000]];
+  const samples = computeSpeedSamples(trace, POINTS, CUM);
+  const mid = samples[0].atM;
+  const kmh = speedAtDistance(samples, mid, 100);
+  assert.ok(kmh > 25 && kmh < 45, `unexpected ${kmh}`); // ~9.3 m/s → ~33 km/h
+  assert.equal(speedAtDistance([], 100), null);
 });
 
 // ---- detectStops ----
@@ -164,4 +175,22 @@ test('buildDetailData: telemetry drives speed + stops for a timestamped lap', ()
   assert.ok(data.overall.totalStoppedMs >= 4000);
   assert.ok(data.overall.avgKmh > 0);
   assert.ok(data.overall.movingAvgKmh > data.overall.avgKmh); // moving avg excludes the stop
+});
+
+test('buildDetailData: corners detected on an L-bend carry a sector and speed', () => {
+  // An L-shaped route (east then north) has one clear corner.
+  const bend = [[0, 0], [0, 0.006], [0, 0.012], [0.006, 0.012], [0.012, 0.012]];
+  const bcum = cumulativeDistances(bend);
+  const r = { id: 'r2', name: 'L', points: bend, cum: bcum,
+    sectorBoundaries: [bcum.at(-1) / 2], timingVersion: 1, lights: [] };
+  // timestamped drive through the whole route
+  const trace = bend.map((p, i) => [p[0], p[1], i * 60000]);
+  const rec = { id: 'x', routeId: 'r2', timingVersion: 1, date: '2026-07-16T08:00:00Z',
+    sectorTimes: [120000, 120000], totalTime: 240000, completed: true,
+    disqualified: false, conformance: 1, simulated: false, actualTrace: trace };
+  const data = buildDetailData(r, rec, [rec]);
+  assert.ok(data.corners.length >= 1, `expected a corner, got ${data.corners.length}`);
+  assert.ok(data.corners.every(c => c.sectorIndex === 0 || c.sectorIndex === 1));
+  assert.ok(data.corners.every(c => c.speedKmh == null || c.speedKmh > 0));
+  assert.ok('topStraightKmh' in data.speedStats);
 });
