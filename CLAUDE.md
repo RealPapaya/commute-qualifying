@@ -162,12 +162,15 @@ stale responses. Keep that pattern when adding another fetch.
 
 ### GPS session (`js/run.js`)
 
-`watchPosition` must be called **synchronously inside the Start click handler** (`btn-arm`, now
-labelled 開始/Start) — iOS Safari fails a geolocation request made after an `await` with
-`PERMISSION_DENIED`, silently, even on an already-granted origin. The wake lock is requested
-afterwards for that reason. Only `PERMISSION_DENIED` ends the watch; `TIMEOUT` and
-`POSITION_UNAVAILABLE` are transient (tunnels, cold start) and the session stays live. The Run
-view intentionally shows just the one Start button at rest (Abort appears once running).
+`watchPosition` must be called **synchronously inside a live user-activation gesture** — iOS
+Safari fails a geolocation request made after an `await` with `PERMISSION_DENIED`, silently,
+even on an already-granted origin. The Run view **auto-arms on open**: `openRun()` calls
+`armGps()` at the end (skipped in `testerMode()` so the simulator tests aren't disturbed), and
+because `openRun` runs synchronously inside the tap that navigated to the Run view (route list
+or the Run tab), the geolocation request still holds that gesture. The wake lock is requested
+afterwards for the same synchronicity reason. Only `PERMISSION_DENIED` ends the watch; `TIMEOUT`
+and `POSITION_UNAVAILABLE` are transient (tunnels, cold start) and the session stays live. The
+開始/Start button (`btn-arm`) remains for re-arming after an Abort; Abort appears once running.
 
 Geolocation needs a **secure context**: `localhost` or HTTPS. A phone hitting
 `http://<pc-ip>:8080` gets no GPS — tunnel it (`npx ngrok http 8080`) or host it over HTTPS.

@@ -1849,9 +1849,14 @@ body.chromeless-topbar .track-diagram-head {
     left: 0;
     right: 0;
     bottom: 0;
-    max-height: min(46dvh, calc(100% - 72px));
+    /* Tall ceiling so the handle can be dragged to any size the driver wants,
+       from a peek to nearly full-screen; the drag offset (set in bottomSheet.js)
+       decides how much of that height is actually revealed. */
+    max-height: min(86dvh, calc(100% - 56px));
     padding: 12px 14px 16px;
     overflow-y: auto;
+    /* --sheet-drag-offset slides the panel continuously; the fallback keeps it
+       collapsed (only the ~48px handle peeking) until bottomSheet.js runs. */
     transform: translateY(var(--sheet-drag-offset, calc(100% - 48px)));
     transition: transform 180ms ease;
     will-change: transform;
@@ -1861,65 +1866,11 @@ body.chromeless-topbar .track-diagram-head {
     padding: 10px 12px 12px;
   }
 
-  .editor-panel[data-sheet-state="expanded"],
-  .run-panel[data-sheet-state="expanded"],
-  .run-panel[data-sheet-state="mid"] {
-    transform: translateY(var(--sheet-drag-offset, 0));
-  }
-
+  /* While the finger is down the panel must track it 1:1, with no easing lag. */
   .editor-panel[data-dragging],
   .run-panel[data-dragging] {
     transition: none;
   }
-
-  /* MID size — focus on the hero clock. Everything but the clock and a strip of
-     sector colour bars is hidden with display:none, so the panel shrinks to fit
-     its own content and sits flush at the bottom (translateY 0, like expanded).
-     The bars carry only each sector's record status (pending / current =
-     black frame / all-time best = purple / session best = green / slower =
-     yellow); the
-     numbers live in the expanded size. */
-  .run-panel[data-sheet-state="mid"] > .run-status,
-  .run-panel[data-sheet-state="mid"] > .toolbar,
-  .run-panel[data-sheet-state="mid"] > #gps-info {
-    display: none;
-  }
-
-  .run-panel[data-sheet-state="mid"] .run-clock {
-    font-size: clamp(52px, 17vw, 76px);
-    margin-bottom: 8px;
-  }
-
-  .run-panel[data-sheet-state="mid"] .sector-board {
-    flex-direction: row;
-    gap: 5px;
-    margin-bottom: 2px;
-  }
-
-  .run-panel[data-sheet-state="mid"] .sector-row {
-    display: block;
-    flex: 1;
-    min-height: 0;
-    height: 12px;
-    padding: 0;
-    border: 0;
-    border-radius: 4px;
-    background: var(--border);
-  }
-
-  .run-panel[data-sheet-state="mid"] .sector-row > span {
-    display: none;
-  }
-
-  .run-panel[data-sheet-state="mid"] .sector-row.current {
-    background: var(--border);
-    outline: 2px solid var(--bar);
-    outline-offset: -2px;
-  }
-  .run-panel[data-sheet-state="mid"] .sector-row.set-purple { background: var(--purple); }
-  .run-panel[data-sheet-state="mid"] .sector-row.set-green { background: var(--green); }
-  .run-panel[data-sheet-state="mid"] .sector-row.set-yellow { background: var(--yellow); }
-  .run-panel[data-sheet-state="mid"] .sector-row.total-row { display: none; }
 
   .panel-head {
     gap: 8px;

@@ -74,18 +74,14 @@ console.log('close: ok');
 // its handle appears clipped.
 const sheetBeforeExpand = await page.evaluate(() => ({
   scrollY,
-  state: document.querySelector('.run-panel').dataset.sheetState,
+  expanded: document.querySelector('.run-panel .sheet-handle').getAttribute('aria-expanded'),
 }));
-if (sheetBeforeExpand.scrollY !== 0 || sheetBeforeExpand.state !== 'collapsed') {
+if (sheetBeforeExpand.scrollY !== 0 || sheetBeforeExpand.expanded !== 'false') {
   throw new Error(`Run sheet is not reset after summary dismissal: ${JSON.stringify(sheetBeforeExpand)}`);
 }
-// The run sheet now cycles collapsed → mid → expanded on tap; step to expanded.
+// The run sheet now resizes by dragging its handle; a plain tap toggles it open.
 await page.click('.run-panel .sheet-handle');
-await page.waitForFunction(() =>
-  document.querySelector('.run-panel').dataset.sheetState === 'mid');
-await page.click('.run-panel .sheet-handle');
-await page.waitForFunction(() =>
-  document.querySelector('.run-panel').dataset.sheetState === 'expanded');
+await page.waitForSelector('.run-panel .sheet-handle[aria-expanded="true"]');
 console.log('run sheet after summary: expandable');
 
 await page.click('#btn-back');

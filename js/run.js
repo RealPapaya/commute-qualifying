@@ -153,6 +153,13 @@ export function openRun(r) {
   setStatus('', '');
   $('run-clock').textContent = fmtTime(null);
   renderBoard();
+
+  // Start recording immediately — the driver shouldn't have to tap 開始. This
+  // runs synchronously inside the tap that opened the Run view (route list or
+  // the Run tab), so the geolocation request still has live user activation:
+  // iOS Safari silently denies watchPosition made outside a user gesture.
+  // Testers drive the simulator instead, so auto-arming is skipped for them.
+  if (!testerMode()) armGps();
 }
 
 function drawRunRoute() {

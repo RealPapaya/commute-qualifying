@@ -7,7 +7,13 @@ const W = +(process.argv[2] || 390);
 const H = +(process.argv[3] || 844);
 
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
-const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 2 });
+// The Run view auto-arms GPS on open (no ?test here), so grant geolocation and
+// park it well off-route: the sheet then shows a clean armed/"not on route"
+// state instead of a permission-denied error.
+const page = await browser.newPage({
+  viewport: { width: W, height: H }, deviceScaleFactor: 2,
+  permissions: ['geolocation'], geolocation: { latitude: 25.05, longitude: 121.55 },
+});
 await page.route('**/favicon.ico', route => route.fulfill({ status: 204, body: '' }));
 const errors = [];
 page.on('pageerror', e => errors.push(String(e)));
@@ -52,6 +58,20 @@ if (Object.values(fonts).some(v => !v)) {
 }
 
 const shot = n => page.screenshot({ path: `test/shots/shell-${n}.png` });
+// The bottom sheets resize by dragging the handle (no discrete states / tap
+// cycle anymore): drag it up the full viewport to reveal the panel, then wait
+// for aria-expanded to flip.
+const openSheet = async panel => {
+  const box = await page.locator(`${panel} .sheet-handle`).boundingBox();
+  const x = box.x + box.width / 2;
+  const startY = box.y + box.height / 2;
+  await page.mouse.move(x, startY);
+  await page.mouse.down();
+  const steps = 20;
+  for (let i = 1; i <= steps; i++) await page.mouse.move(x, startY - (startY - 20) * i / steps);
+  await page.mouse.up();
+  await page.waitForSelector(`${panel} .sheet-handle[aria-expanded="true"]`);
+};
 const waitForMap = async hook => {
   await page.waitForTimeout(150); // allow openRoute/openRun's deferred fitBounds
   await page.waitForFunction(name => {
@@ -72,11 +92,13 @@ await shot('1-routes');
 await page.click('#route-list [data-edit]');
 await waitForMap('_editorMap');
 await shot('2-editor-collapsed');
-await page.click('.editor-panel .sheet-handle');
-await page.waitForSelector('.editor-panel[data-sheet-state="expanded"]');
+await openSheet('.editor-panel');
 await page.waitForTimeout(250);
 await shot('2-editor');
 
+// 賽道圖 lives inside the collapsible 進階 section — open it before clicking.
+await page.click('#btn-editor-advanced');
+await page.waitForSelector('#editor-advanced:not([hidden])');
 await page.click('#btn-track-diagram');
 await page.waitForSelector('#track-diagram-svg svg');
 await page.waitForTimeout(300);
@@ -88,14 +110,8 @@ await page.click('[data-view="routes"]');
 await page.click('#route-list [data-run]');
 await waitForMap('_runMap');
 await shot('4-run-collapsed');
-// The run sheet cycles collapsed → mid → expanded. Mid is the clock-focused
-// size: hero clock + a strip of sector colour bars, no numbers.
-await page.click('.run-panel .sheet-handle');
-await page.waitForSelector('.run-panel[data-sheet-state="mid"]');
-await page.waitForTimeout(250);
-await shot('4-run-mid');
-await page.click('.run-panel .sheet-handle');
-await page.waitForSelector('.run-panel[data-sheet-state="expanded"]');
+// The run sheet resizes by dragging its handle to any height; open it fully.
+await openSheet('.run-panel');
 await page.waitForTimeout(250);
 await shot('4-run');
 
