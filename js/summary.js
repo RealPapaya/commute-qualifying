@@ -238,6 +238,8 @@ export function renderSummary(container, data) {
           </div>
         </div>
       </div>
+
+      <button type="button" class="f1c-details">詳細數據 / DETAILS ›</button>
     </div>`;
 
   container.querySelector('.f1c-track').appendChild(trackSvg(data.route));
@@ -246,20 +248,30 @@ export function renderSummary(container, data) {
 // ---- overlay ----
 
 let onClose = null;
+let lastShown = null;   // { route, record, runs } for the detail sheet
 
 export function initSummary() {
   const overlay = document.getElementById('summary-overlay');
   overlay.addEventListener('click', e => {
+    if (e.target.closest('.f1c-details')) {
+      // Lazy-load the (heavier) detail analysis only when it's actually opened.
+      if (lastShown) import('./detail.js').then(m =>
+        m.showDetail(lastShown.route, lastShown.record, lastShown.runs));
+      return;
+    }
     if (e.target === overlay || e.target.closest('.f1c-close')) hideSummary();
   });
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && !overlay.hidden) hideSummary();
+    // When the detail sheet is stacked on top, let it consume Escape first.
+    const detail = document.getElementById('detail-overlay');
+    if (e.key === 'Escape' && !overlay.hidden && (!detail || detail.hidden)) hideSummary();
   });
 }
 
 export function showSummary(route, record, runs, closeCb) {
   const overlay = document.getElementById('summary-overlay');
   const host = overlay.querySelector('.f1c-host');
+  lastShown = { route, record, runs };
   renderSummary(host, buildSummaryData(route, record, runs));
   overlay.hidden = false;
   onClose = closeCb ?? null;

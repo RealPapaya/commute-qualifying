@@ -592,7 +592,7 @@ async function continueOnNewRoute() {
     sessionBests = route.sectorBoundaries.map(() => null).concat([null]);
     // Conformance is measured against the route you are actually on: reset the
     // trace so the new route is scored fresh from the current position.
-    lapTrace = [[acceptedFix.lat, acceptedFix.lng]];
+    lapTrace = [[acceptedFix.lat, acceptedFix.lng, acceptedFix.t]];
     resetOffRouteFlag();
     drawRunRoute();
     updateTrackCursor();
@@ -650,7 +650,7 @@ function restartRun() {
   const restarted = createRun(route);
   if (!startRunAtFix(restarted, fix)) return;
   run = restarted;
-  lapTrace = [[fix.lat, fix.lng]];
+  lapTrace = [[fix.lat, fix.lng, fix.t]];
   resetOffRouteFlag();
   setStatus('LIVE — timer restarted from the current position.', 'live');
   $('run-clock').textContent = fmtTime(0);
@@ -678,7 +678,10 @@ function handleFix(fix) {
 
   // Record the actually-driven path (including off-route strays, which is what
   // drags conformance down) so the lap can be scored for a DSQ at the finish.
-  if (run.state === 'running' || ev === 'finish') lapTrace.push([fix.lat, fix.lng]);
+  // The timestamp is carried as a third element ([lat,lng,t]) to power the
+  // post-run detail sheet's speed profile and stop detection; conformance reads
+  // only [0]/[1] and is unaffected.
+  if (run.state === 'running' || ev === 'finish') lapTrace.push([fix.lat, fix.lng, fix.t]);
 
   showCursor([fix.lat, fix.lng]);
   updateTrackCursor();
@@ -715,7 +718,9 @@ function saveCompletedLap(lap) {
     simulated: simTimer != null,
     conformance,
     disqualified,
-    actualTrace: lapTrace.map(p => [p[0], p[1]]),
+    // Preserve the fix timestamp when present so the detail sheet can reconstruct
+    // speed and stops; older laps (and reseeds without a time) stay [lat,lng].
+    actualTrace: lapTrace.map(p => p.length >= 3 ? [p[0], p[1], p[2]] : [p[0], p[1]]),
   };
   saveRun(record);
   // A disqualified lap is off-route driving, not a valid time: it never sets a
@@ -740,7 +745,7 @@ function finishLap() {
   if (!lap) return;
   const record = saveCompletedLap(lap);
   // Seed the next lap's trace with the crossing fix so measurement stays continuous.
-  lapTrace = latestFix ? [[latestFix.lat, latestFix.lng]] : [];
+  lapTrace = latestFix ? [[latestFix.lat, latestFix.lng, latestFix.t]] : [];
   setStatus(record.disqualified
     ? `LAP ${lap.number} ${dsqNotice(record)}`
     : `LAP ${lap.number} FINISHED — ${fmtTime(lap.totalTime)}${record.simulated ? ' (simulated)' : ''}. Keep going for the next lap.`,

@@ -65,9 +65,24 @@ ascending, exclusive of 0 and total — so N boundaries means N+1 sectors.
 
 A **run** record is `{ id, routeId, timingVersion, date, sectorTimes[], totalTime, completed,
 simulated, conformance, disqualified, actualTrace[] }`. `actualTrace` is the actually-driven
-path (accepted GPS fixes for that lap); `conformance` (0–1) is the fraction of that path's
-distance that stayed within the route corridor (`js/conformance.js`); `disqualified` is true
-when `conformance < 0.95` (labelled **DSQ** in the UI).
+path (accepted GPS fixes for that lap), stored as `[lat, lng, t]` triples where `t` is the fix
+epoch-ms — the timestamp powers the detail sheet's speed profile and stop detection. Legacy
+laps recorded before timestamps carry plain `[lat, lng]`; conformance reads only `[0]/[1]` so
+it is unaffected, and the detail sheet degrades gracefully. `conformance` (0–1) is the fraction
+of that path's distance that stayed within the route corridor (`js/conformance.js`);
+`disqualified` is true when `conformance < 0.95` (labelled **DSQ** in the UI).
+
+### Post-run summary & detail sheet
+
+`js/summary.js` renders the F1 circuit-info card (the `#summary-overlay`). Its **詳細數據 /
+DETAILS** button dynamically imports `js/detail.js`, a deeper telemetry sheet (`#detail-overlay`,
+stacked above the card at a higher z-index). `js/detail.js` keeps the pure/DOM split: everything
+above `renderDetail` (`buildDetailData`, `computeSpeedSamples`, `detectStops`, `sectorSpans`,
+`sectorSpeed`) is DOM-free and unit-tested (`test/detail.test.mjs`). The sheet shows per-sector
+speed (avg/max), stop records (clustered near-stationary fixes, attributed to nearby lights),
+an ideal/theoretical-best lap (sum of best-ever sectors) with time-on-the-table, a speed-vs-
+distance profile, and a lap-by-lap comparison table of per-sector deltas (green = this lap
+faster, red = slower). Sector colours reuse `classifySector`'s purple/green/yellow semantics.
 
 ### Conformance / DSQ
 

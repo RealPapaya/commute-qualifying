@@ -1130,7 +1130,8 @@ body.home-active #topbar {
 }
 
 .sector-row.current {
-  border-left-color: var(--yellow);
+  border-color: var(--bar);
+  border-left-color: var(--bar);
 }
 
 .sector-row.set-purple {
@@ -1874,8 +1875,9 @@ body.chromeless-topbar .track-diagram-head {
   /* MID size — focus on the hero clock. Everything but the clock and a strip of
      sector colour bars is hidden with display:none, so the panel shrinks to fit
      its own content and sits flush at the bottom (translateY 0, like expanded).
-     The bars carry only each sector's record status (pending / current /
-     all-time best = purple / session best = green / slower = yellow); the
+     The bars carry only each sector's record status (pending / current =
+     black frame / all-time best = purple / session best = green / slower =
+     yellow); the
      numbers live in the expanded size. */
   .run-panel[data-sheet-state="mid"] > .run-status,
   .run-panel[data-sheet-state="mid"] > .toolbar,
@@ -1909,7 +1911,11 @@ body.chromeless-topbar .track-diagram-head {
     display: none;
   }
 
-  .run-panel[data-sheet-state="mid"] .sector-row.current { background: var(--yellow); }
+  .run-panel[data-sheet-state="mid"] .sector-row.current {
+    background: var(--border);
+    outline: 2px solid var(--bar);
+    outline-offset: -2px;
+  }
   .run-panel[data-sheet-state="mid"] .sector-row.set-purple { background: var(--purple); }
   .run-panel[data-sheet-state="mid"] .sector-row.set-green { background: var(--green); }
   .run-panel[data-sheet-state="mid"] .sector-row.set-yellow { background: var(--yellow); }
@@ -2285,6 +2291,460 @@ body.chromeless-topbar .track-diagram-head {
   font: 800 calc(8.7 * var(--u)) / calc(9 * var(--u)) 'Archivo', sans-serif;
   font-variation-settings: 'wdth' 62;
   letter-spacing: .02em;
+}
+
+/* "詳細數據 / DETAILS" — the entry point to the telemetry sheet, seated in the
+   summary card's black bottom bar so it reads as part of the card. */
+.f1c-details {
+  display: block;
+  width: 100%;
+  border: 0;
+  cursor: pointer;
+  padding: calc(11 * var(--u)) 0;
+  background: #15151e;
+  color: #fff;
+  font: 800 calc(9 * var(--u)) / 1 'Archivo', sans-serif;
+  font-variation-settings: 'wdth' var(--w-title);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  transition: background .12s ease;
+}
+.f1c-details:hover { background: #e10600; }
+.f1c-details:active { background: #b30500; }
+
+/* ---------------------------------------------------------------------------
+   DETAIL / telemetry sheet.
+   A dark, scrollable analysis stacked over the (white) summary card. Purple /
+   green / yellow keep the sector semantics; here they sit on dark so the vivid
+   variants are used. Everything is Archivo to match the card.
+   --------------------------------------------------------------------------- */
+.detail-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 6100;               /* above .summary-overlay (6000) */
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: #101015;
+  -webkit-overflow-scrolling: touch;
+  color: #f4f4f5;
+  font-family: 'Archivo', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.detail-overlay[hidden] { display: none; }
+
+.dt-close {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .12);
+  color: #fff;
+  font: 700 16px/1 system-ui, sans-serif;
+  cursor: pointer;
+}
+.dt-close:hover { background: #e10600; }
+
+.dt-host { width: 100%; }
+
+.dt-sheet {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 20px 16px 40px;
+  box-sizing: border-box;
+}
+
+/* --- header --- */
+.dt-head {
+  padding: 8px 4px 18px;
+  border-bottom: 2px solid #26262f;
+}
+.dt-head-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.dt-kicker {
+  font: 800 10px/1 'Archivo', sans-serif;
+  font-variation-settings: 'wdth' 96;
+  letter-spacing: .18em;
+  color: #8c8c98;
+  text-transform: uppercase;
+}
+.dt-badge {
+  font: 800 10px/1 'Archivo', sans-serif;
+  letter-spacing: .08em;
+  padding: 6px 9px;
+  border-radius: 4px;
+  background: #26262f;
+  color: #cfcfd6;
+  white-space: nowrap;
+}
+.dt-badge-pb { background: var(--purple); color: #fff; }
+.dt-badge-dsq { background: #e10600; color: #fff; }
+.dt-title {
+  margin-top: 12px;
+  font: 800 26px/1.02 'Archivo', sans-serif;
+  font-variation-settings: 'wdth' var(--w-title);
+  letter-spacing: -.01em;
+  text-transform: uppercase;
+}
+.dt-subtitle {
+  margin-top: 6px;
+  font: 600 11px/1.3 'Archivo', sans-serif;
+  letter-spacing: .04em;
+  color: #9a9aa4;
+}
+.dt-laptime {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 14px;
+}
+.dt-laptime-val {
+  font: 800 40px/1 'Archivo', sans-serif;
+  font-variation-settings: 'wdth' 108;
+  letter-spacing: -.02em;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+.dt-laptime-lbl {
+  font: 700 10px/1 'Archivo', sans-serif;
+  letter-spacing: .16em;
+  color: #8c8c98;
+}
+
+/* --- stat tiles --- */
+.dt-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 18px;
+}
+.dt-tile {
+  background: #1a1a22;
+  border: 1px solid #26262f;
+  border-radius: 8px;
+  padding: 12px 10px;
+}
+.dt-tile-val {
+  font: 800 21px/1 'Archivo', sans-serif;
+  font-variation-settings: 'wdth' 100;
+  letter-spacing: -.01em;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+.dt-tile-unit {
+  font-size: 11px;
+  font-weight: 700;
+  color: #8c8c98;
+  margin-left: 1px;
+}
+.dt-tile-label {
+  margin-top: 7px;
+  font: 700 8.5px/1.25 'Archivo', sans-serif;
+  letter-spacing: .05em;
+  color: #7f7f8a;
+  text-transform: uppercase;
+}
+
+/* --- sections --- */
+.dt-sec { margin-top: 26px; }
+.dt-h {
+  font: 800 12px/1 'Archivo', sans-serif;
+  font-variation-settings: 'wdth' 100;
+  letter-spacing: .12em;
+  color: #f4f4f5;
+  text-transform: uppercase;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #26262f;
+}
+
+/* --- ideal lap --- */
+.dt-ideal {
+  margin-top: 18px;
+  background: linear-gradient(135deg, #1c1430, #14141c);
+  border: 1px solid #3a2a5c;
+  border-radius: 10px;
+  padding: 14px 15px;
+}
+.dt-ideal-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.dt-ideal-title {
+  font: 800 11px/1 'Archivo', sans-serif;
+  letter-spacing: .1em;
+  color: var(--purple-vivid);
+}
+.dt-ideal-time {
+  font: 800 24px/1 'Archivo', sans-serif;
+  font-variation-settings: 'wdth' 108;
+  letter-spacing: -.02em;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+.dt-ideal-sub {
+  margin-top: 8px;
+  font: 600 11px/1.5 'Archivo', sans-serif;
+  color: #b9b9c3;
+}
+.dt-ideal-sub b { color: #ff6a6a; font-weight: 800; }
+
+/* --- sector rows --- */
+.dt-legend {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 12px 0 4px;
+}
+.dt-lg {
+  font: 700 9.5px/1 'Archivo', sans-serif;
+  letter-spacing: .04em;
+  padding: 4px 7px;
+  border-radius: 4px;
+  background: #1a1a22;
+}
+.dt-lg.dt-purple { color: var(--purple-vivid); border: 1px solid #3a2a5c; }
+.dt-lg.dt-green { color: var(--green-vivid); border: 1px solid #1e4a30; }
+.dt-lg.dt-yellow { color: var(--yellow-vivid); border: 1px solid #4a3d16; }
+
+.dt-sectors { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.dt-srow {
+  background: #1a1a22;
+  border-left: 4px solid #3a3a46;
+  border-radius: 6px;
+  padding: 11px 13px;
+}
+.dt-srow.dt-purple { border-left-color: var(--purple-vivid); }
+.dt-srow.dt-green { border-left-color: var(--green-vivid); }
+.dt-srow.dt-yellow { border-left-color: var(--yellow-vivid); }
+.dt-srow-head {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: baseline;
+  gap: 10px;
+}
+.dt-slabel {
+  font: 800 14px/1 'Archivo', sans-serif;
+  letter-spacing: .02em;
+  color: #fff;
+}
+.dt-stime {
+  font: 800 16px/1 'Archivo', sans-serif;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.01em;
+  color: #fff;
+}
+.dt-srow.dt-purple .dt-stime { color: var(--purple-vivid); }
+.dt-srow.dt-green .dt-stime { color: var(--green-vivid); }
+.dt-srow.dt-yellow .dt-stime { color: #fff; }
+.dt-sdelta {
+  font: 700 12px/1 'Archivo', sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+.dt-sdelta.faster { color: var(--green-vivid); }
+.dt-sdelta.slower { color: #ff6a6a; }
+.dt-sdelta.flat { color: #8c8c98; }
+
+.dt-tag {
+  display: inline-block;
+  vertical-align: middle;
+  font: 800 8px/1 'Archivo', sans-serif;
+  letter-spacing: .08em;
+  padding: 3px 5px;
+  border-radius: 3px;
+  margin-left: 4px;
+}
+.dt-tag-pb { background: var(--purple); color: #fff; }
+.dt-tag-new { background: #2b2b36; color: #b9b9c3; }
+
+.dt-srow-bar { margin: 9px 0 8px; }
+.dt-bar {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: #2b2b36;
+  overflow: hidden;
+}
+.dt-bar-fill { display: block; height: 100%; border-radius: 3px; background: #6b6b7a; }
+.dt-bar-fill.fill-purple { background: var(--purple-vivid); }
+.dt-bar-fill.fill-green { background: var(--green-vivid); }
+.dt-bar-fill.fill-yellow { background: var(--yellow-vivid); }
+
+.dt-srow-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  font: 600 11px/1 'Archivo', sans-serif;
+  color: #9a9aa4;
+}
+.dt-srow-meta b {
+  color: #f4f4f5;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.dt-srow-meta i { font-style: normal; color: #7f7f8a; font-size: 10px; }
+.dt-stopbadge {
+  color: var(--yellow-vivid);
+  font-weight: 700;
+}
+
+/* --- speed profile --- */
+.dt-profile { margin-top: 14px; }
+.dt-profile-svg {
+  width: 100%;
+  height: 150px;
+  display: block;
+  background: #16161d;
+  border: 1px solid #26262f;
+  border-radius: 8px;
+}
+.dt-profile-area { fill: rgba(46, 230, 107, .14); }
+.dt-profile-line { stroke: var(--green-vivid); stroke-width: 3; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.dt-grid { stroke: #2f2f3a; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.dt-stopmark { stroke: var(--yellow-vivid); stroke-width: 2; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; opacity: .8; }
+.dt-profile-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font: 700 9px/1 'Archivo', sans-serif;
+  letter-spacing: .1em;
+  color: #7f7f8a;
+}
+
+/* --- stops --- */
+.dt-stop-summary {
+  margin-top: 14px;
+  font: 600 12px/1.5 'Archivo', sans-serif;
+  color: #b9b9c3;
+}
+.dt-stop-summary b { color: var(--yellow-vivid); font-weight: 800; }
+.dt-stops { margin-top: 10px; display: flex; flex-direction: column; gap: 7px; }
+.dt-stop {
+  display: flex;
+  align-items: stretch;
+  gap: 11px;
+  background: #1a1a22;
+  border: 1px solid #26262f;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.dt-stop-n {
+  flex: 0 0 22px;
+  display: grid;
+  place-items: center;
+  align-self: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--yellow);
+  color: #15151e;
+  font: 800 11px/1 'Archivo', sans-serif;
+}
+.dt-stop-body { flex: 1; min-width: 0; }
+.dt-stop-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.dt-stop-where { font: 800 12px/1 'Archivo', sans-serif; color: #f4f4f5; }
+.dt-stop-dur {
+  font: 800 13px/1 'Archivo', sans-serif;
+  color: var(--yellow-vivid);
+  font-variant-numeric: tabular-nums;
+}
+.dt-stop-sub { margin-top: 5px; font: 600 10.5px/1 'Archivo', sans-serif; color: #8c8c98; }
+
+/* --- comparison table --- */
+.dt-table-scroll {
+  margin-top: 14px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 8px;
+  border: 1px solid #26262f;
+}
+.dt-table {
+  border-collapse: collapse;
+  width: 100%;
+  font: 700 11px/1 'Archivo', sans-serif;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.dt-table th, .dt-table td {
+  padding: 8px 10px;
+  text-align: right;
+  border-bottom: 1px solid #23232c;
+}
+.dt-table th {
+  color: #8c8c98;
+  font-weight: 800;
+  letter-spacing: .06em;
+  background: #16161d;
+  position: sticky;
+  top: 0;
+}
+.dt-table th:first-child, .dt-table td:first-child {
+  text-align: left;
+  position: sticky;
+  left: 0;
+  background: #1a1a22;
+}
+.dt-lapname { color: #b9b9c3; font-weight: 700; }
+.dt-row-this td { background: #201a34 !important; color: #fff; font-weight: 800; }
+.dt-row-this .dt-lapname { color: var(--purple-vivid); }
+.dt-t { color: #e8e8ec; }
+.dt-t.dt-purple { color: var(--purple-vivid); }
+.dt-t.dt-green { color: var(--green-vivid); }
+.dt-t.dt-yellow { color: #e8e8ec; }
+.dt-t.dt-total, .dt-d.dt-total { font-weight: 800; border-left: 1px solid #2f2f3a; }
+.dt-d.faster { color: var(--green-vivid); }
+.dt-d.slower { color: #ff6a6a; }
+.dt-d.flat { color: #6e6e78; }
+.dt-sim {
+  font-size: 8px;
+  color: #7f7f8a;
+  border: 1px solid #3a3a46;
+  border-radius: 3px;
+  padding: 1px 3px;
+}
+.dt-tablenote {
+  margin-top: 9px;
+  font: 600 10.5px/1.5 'Archivo', sans-serif;
+  color: #8c8c98;
+}
+.dt-tablenote .faster { color: var(--green-vivid); font-weight: 700; }
+.dt-tablenote .slower { color: #ff6a6a; font-weight: 700; }
+.dt-tablenote strong { color: #d5d5db; }
+
+/* --- empty / clean states --- */
+.dt-empty, .dt-clean {
+  margin-top: 14px;
+  padding: 14px;
+  background: #16161d;
+  border: 1px dashed #33333f;
+  border-radius: 8px;
+  font: 600 12px/1.6 'Archivo', sans-serif;
+  color: #b9b9c3;
+}
+.dt-clean { border-color: #1e4a30; }
+.dt-empty-en { color: #7f7f8a; font-size: 10.5px; }
+
+.dt-foot {
+  margin-top: 34px;
+  padding-top: 14px;
+  border-top: 1px solid #26262f;
+  text-align: center;
+  font: 700 9px/1 'Archivo', sans-serif;
+  letter-spacing: .14em;
+  color: #6e6e78;
+  text-transform: uppercase;
 }
 
 /* Generic confirm dialog (unsaved-edits prompt on leaving the editor). */
