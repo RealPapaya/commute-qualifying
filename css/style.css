@@ -2462,10 +2462,21 @@ body.chromeless-topbar .track-diagram-head {
 }
 
 /* --- speed map --- */
-.dt-map { margin-top: 12px; background: #fafafa; border: 1px solid #ececec; border-radius: 10px; padding: 6px; }
-.dt-map-svg { width: 100%; height: auto; display: block; }
+.dt-map { position: relative; margin-top: 12px; background: #fafafa; border: 1px solid #ececec; border-radius: 10px; padding: 6px; overflow: hidden; }
+.dt-map-svg { width: 100%; height: auto; display: block; touch-action: none; cursor: grab; }
+.dt-map-svg:active { cursor: grabbing; }
 .dt-map-cnum { fill: #15151e; font: 800 22px 'Archivo', sans-serif; }
 .dt-map-cspd { fill: #1565c0; font: 800 24px 'Archivo', sans-serif; }
+.dt-sel-ring { fill: none; stroke: #1565c0; stroke-width: 5; }
+.dt-sel-seg { stroke: #15151e; stroke-width: 5; stroke-linecap: round; opacity: .9; }
+.dt-map-ctrl { position: absolute; top: 12px; right: 12px; display: flex; flex-direction: column; gap: 6px; }
+.dt-map-ctrl button {
+  width: 32px; height: 32px; border: 1px solid #d7d7dd; border-radius: 7px;
+  background: rgba(255, 255, 255, .92); color: #15151e; cursor: pointer;
+  font: 700 18px/1 system-ui, sans-serif; display: grid; place-items: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .12);
+}
+.dt-map-ctrl button:hover { background: #15151e; color: #fff; border-color: #15151e; }
 .dt-map-legend {
   display: flex;
   align-items: center;
@@ -2482,6 +2493,32 @@ body.chromeless-topbar .track-diagram-head {
   border-radius: 4px;
   background: linear-gradient(90deg, #e10600, #f5be1e 50%, #12a53f);
 }
+.dt-map-info {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 10px;
+  margin-top: 10px; padding: 11px 13px; background: #f4f4f4; border-radius: 8px;
+  border-left: 4px solid #cfcfd6;
+}
+.dt-map-info-empty { color: #6e6e77; font: 600 11.5px/1.4 'Archivo', sans-serif; border-left-color: #e0e0e0; }
+.dt-mi-tag { font: 800 12px/1 'Archivo', sans-serif; color: #fff; background: #15151e; padding: 4px 7px; border-radius: 4px; }
+.dt-mi-tag.dt-mi-purple { background: var(--purple); }
+.dt-mi-tag.dt-mi-green { background: var(--green); }
+.dt-mi-tag.dt-mi-yellow { background: var(--yellow); }
+.dt-mi-main { font: 800 18px/1 'Archivo', sans-serif; font-variant-numeric: tabular-nums; }
+.dt-mi-main i { font-style: normal; font-size: 10px; font-weight: 700; color: #9a9aa2; }
+.dt-mi-sub { font: 600 10.5px/1.3 'Archivo', sans-serif; color: #6e6e77; width: 100%; }
+
+/* --- corner speed chart --- */
+.dt-cchart { display: flex; gap: 8px; margin-top: 12px; height: 130px; }
+.dt-cchart-yaxis { display: flex; flex-direction: column; justify-content: space-between; font: 700 9px/1 'Archivo', sans-serif; color: #9a9aa2; padding: 2px 0 16px; }
+.dt-cchart-bars { flex: 1; display: flex; align-items: flex-end; gap: 8px; }
+.dt-cbar-col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; }
+.dt-cbar-val { font: 800 11px/1 'Archivo', sans-serif; font-variant-numeric: tabular-nums; margin-bottom: 3px; }
+.dt-cbar-track { flex: 1; width: 100%; display: flex; align-items: flex-end; }
+.dt-cbar { width: 100%; min-height: 3px; border-radius: 4px 4px 0 0; background: var(--green); }
+.dt-cbar-col.slow .dt-cbar { background: #e10600; }
+.dt-cbar-col.slow .dt-cbar-val { color: #e10600; }
+.dt-cbar-lbl { margin-top: 5px; font: 800 10px/1 'Archivo', sans-serif; color: #4a4a52; }
+.dt-cchart-cap { margin-top: 4px; text-align: right; font: 700 8px/1 'Archivo', sans-serif; letter-spacing: .06em; color: #9a9aa2; text-transform: uppercase; }
 
 /* --- corner & straight speeds --- */
 .dt-cstats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
@@ -2548,14 +2585,21 @@ body.chromeless-topbar .track-diagram-head {
 .dt-srow-meta i { font-style: normal; color: #9a9aa2; font-size: 10px; }
 .dt-stopbadge { color: var(--yellow); font-weight: 700; }
 
-/* --- speed profile --- */
-.dt-profile { margin-top: 12px; }
-.dt-profile-svg { width: 100%; height: 140px; display: block; background: #f7f7f7; border: 1px solid #ececec; border-radius: 8px; }
+/* --- speed profile (with speed + sector axes) --- */
+.dt-profile { margin-top: 12px; display: grid; grid-template-columns: 26px 1fr; grid-template-rows: auto auto auto; grid-template-areas: "yunit plot" "yunit xaxis" ". xunit"; }
+.dt-profile-yunit { grid-area: yunit; align-self: start; justify-self: start; writing-mode: vertical-rl; transform: rotate(180deg); font: 700 8px/1 'Archivo', sans-serif; letter-spacing: .1em; color: #9a9aa2; text-transform: uppercase; padding-top: 4px; }
+.dt-profile-plot { grid-area: plot; position: relative; padding-left: 30px; }
+.dt-profile-yaxis { position: absolute; left: 0; top: 0; bottom: 0; width: 28px; }
+.dt-profile-yaxis span { position: absolute; right: 4px; transform: translateY(-50%); font: 700 9px/1 'Archivo', sans-serif; color: #9a9aa2; font-variant-numeric: tabular-nums; }
+.dt-profile-svg { width: 100%; height: 150px; display: block; background: #f7f7f7; border: 1px solid #ececec; border-radius: 8px; }
 .dt-profile-area { fill: rgba(18, 165, 63, .16); }
 .dt-profile-line { stroke: var(--green); stroke-width: 3; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
-.dt-grid { stroke: #d7d7dd; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.dt-grid { stroke: #e2e2e6; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.dt-grid-sector { stroke: #c7c7d0; stroke-dasharray: 5 4; }
 .dt-stopmark { stroke: var(--yellow); stroke-width: 2; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
-.dt-profile-axis { display: flex; justify-content: space-between; margin-top: 6px; font: 700 9px/1 'Archivo', sans-serif; letter-spacing: .1em; color: #9a9aa2; text-transform: uppercase; }
+.dt-profile-xaxis { grid-area: xaxis; position: relative; height: 16px; margin-left: 30px; }
+.dt-profile-xaxis span { position: absolute; transform: translateX(-50%); top: 4px; font: 800 9px/1 'Archivo', sans-serif; color: #4a4a52; }
+.dt-profile-xunit { grid-area: xunit; text-align: center; margin-left: 30px; font: 700 8px/1 'Archivo', sans-serif; letter-spacing: .12em; color: #9a9aa2; text-transform: uppercase; }
 
 /* --- stops --- */
 .dt-stop-summary { margin-top: 12px; font: 600 12px/1.5 'Archivo', sans-serif; color: #4a4a52; }
@@ -2587,8 +2631,8 @@ body.chromeless-topbar .track-diagram-head {
 .dt-tablenote { margin-top: 9px; font: 600 10.5px/1.5 'Archivo', sans-serif; color: #6e6e77; }
 
 /* --- empty / clean states --- */
-.dt-empty, .dt-clean { margin-top: 12px; padding: 13px; background: #f7f7f7; border: 1px dashed #d7d7dd; border-radius: 8px; font: 600 12px/1.6 'Archivo', sans-serif; color: #4a4a52; }
-.dt-clean { border-color: #bfe6cd; background: #f1faf4; }
+.dt-empty { margin-top: 12px; padding: 13px 14px; background: #f4f4f4; border: 1px solid #ececec; border-left: 4px solid #cfcfd6; border-radius: 8px; font: 600 12px/1.6 'Archivo', sans-serif; color: #4a4a52; }
+.dt-clean { margin-top: 12px; padding: 13px 14px; background: #f1faf4; border: 1px solid #cdeed7; border-left: 4px solid var(--green); border-radius: 8px; font: 700 12.5px/1.5 'Archivo', sans-serif; color: #12703a; }
 
 .dt-foot { margin: 28px 18px 0; padding: 14px 0 18px; border-top: 1px solid #ececec; text-align: center; font: 700 9px/1 'Archivo', sans-serif; letter-spacing: .12em; color: #9a9aa2; text-transform: uppercase; }
 

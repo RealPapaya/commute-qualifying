@@ -79,18 +79,23 @@ DETAILS** button dynamically imports `js/detail.js`, a deeper telemetry sheet (`
 stacked above the card at a higher z-index). The sheet deliberately shares the card's visual
 language — **white surface, black text, Archivo, black section bars** — and is **single-language**,
 driven by the app's i18n setting (a local `STR`/`L()` table in `detail.js`, re-rendered on
-`languagechange`); never mix both languages. `js/detail.js` keeps the pure/DOM split: everything
-above `renderDetail` (`buildDetailData`, `computeSpeedSamples`, `speedAtDistance`, `detectStops`,
-`sectorSpans`, `sectorSpeed`) is DOM-free and unit-tested (`test/detail.test.mjs`).
+`languagechange`); never mix both languages (the summary card's DETAILS button also localises via
+`translate('detailsButton')`). `js/detail.js` keeps the pure/DOM split: everything above
+`renderDetail` (`buildDetailData`, `computeSpeedSamples`, `speedAtDistance`, `detectStops`,
+`sectorSpans`, `sectorSpeed`, `computeMapGeom`) is DOM-free and unit-tested (`test/detail.test.mjs`).
 
-Sections: a **speed map** (the hero) — the route drawn via `trackDiagram.computeProjection`, each
-segment coloured by the speed driven there (red slow → green fast), with corner numbers +
-per-corner speed labels (`detectCorners` + `speedAtDistance`), 🚦 stop flags, and start/finish;
-a **corner & straight** breakdown (top straight speed, slowest corner, avg corner, per-corner
-speed/turn/sector); per-sector time + speed (avg/max); an ideal/theoretical-best lap with
-time-on-the-table; a speed-vs-distance profile; stop records (clustered near-stationary fixes
-attributed to nearby lights); and a lap-by-lap comparison table of per-sector deltas (green =
-this lap faster, red = slower). Sector colours reuse `classifySector`'s purple/green/yellow.
+Sections: an **interactive speed map** (the hero) — the route drawn via
+`trackDiagram.computeProjection`, each segment coloured by the speed driven there (red slow →
+green fast), with corner numbers + per-corner speed labels (`detectCorners` + `speedAtDistance`),
+🚦 stop flags and start/finish. `wireSpeedMap` adds self-contained wheel/pinch zoom, drag-pan and
+tap-to-inspect (all pointer listeners live on the `<svg>` so they die with it on re-render):
+tapping a corner or sector zooms to it, rings/outlines it in a `.dt-map-overlay` `<g>`, and writes
+its numbers into `.dt-map-info`. Then a **corner-speed bar chart** (`cornerChartSvg`); a **corner &
+straight** breakdown; per-sector time + speed; an ideal/theoretical-best lap with time-on-the-table;
+a **speed profile** with a labelled km/h Y-axis and a sector X-axis (`profileBlock`); stop records
+(clustered near-stationary fixes attributed to nearby lights); and a lap-by-lap comparison table of
+per-sector deltas (green = this lap faster, red = slower). Sector colours reuse `classifySector`'s
+purple/green/yellow.
 
 ### Conformance / DSQ
 

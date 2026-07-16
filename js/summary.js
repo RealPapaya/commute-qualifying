@@ -7,6 +7,7 @@
 import { cumulativeDistances } from './geo.js';
 import { computeProjection, detectCorners } from './trackDiagram.js';
 import { allTimeBests } from './store.js';
+import { translate } from './i18n.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 
@@ -239,7 +240,7 @@ export function renderSummary(container, data) {
         </div>
       </div>
 
-      <button type="button" class="f1c-details">詳細數據 / DETAILS ›</button>
+      <button type="button" class="f1c-details">${esc(translate('detailsButton'))}</button>
     </div>`;
 
   container.querySelector('.f1c-track').appendChild(trackSvg(data.route));

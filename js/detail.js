@@ -34,9 +34,14 @@ const STR = {
     stopsTile: 'STOPS', stoppedTile: 'STOPPED', conformance: 'CONFORMANCE',
     sectors: 'sectors', kmh: 'km/h',
     speedMap: 'SPEED MAP', speedMapHint: 'Coloured by your speed — green fast, red slow. 🚦 = stop.',
+    mapTapHint: 'Tap a corner or sector to inspect · scroll or pinch to zoom.',
+    tapPrompt: 'Tap a corner or sector on the map to see its numbers.',
+    zoomIn: 'Zoom in', zoomOut: 'Zoom out', zoomReset: 'Reset view',
     slow: 'SLOW', fast: 'FAST',
-    cornerSpeeds: 'CORNER & STRAIGHT SPEED', topStraight: 'Top straight', slowestCorner: 'Slowest corner', avgCorner: 'Avg corner',
+    cornerSpeeds: 'CORNER & STRAIGHT SPEED', cornerChart: 'CORNER SPEED CHART',
+    topStraight: 'Top straight', slowestCorner: 'Slowest corner', avgCorner: 'Avg corner',
     corner: 'Corner', straightLbl: 'straight', turn: 'turn',
+    sectorWord: 'Sector', cornerWord: 'Corner', speedWord: 'Speed', timeWord: 'Time', distanceWord: 'Distance',
     sectorAnalysis: 'SECTOR ANALYSIS', legPurple: 'new best', legGreen: 'session best', legYellow: 'slower',
     best: 'BEST', first: 'FIRST', avg: 'avg', max: 'max', ofLap: 'of lap',
     idealLap: 'IDEAL LAP', idealSub: 'Sum of your best-ever sectors.', thisLapIs: 'This lap', toFind: 'to find',
@@ -58,9 +63,14 @@ const STR = {
     stopsTile: '停等次數', stoppedTile: '停等時間', conformance: '符合度',
     sectors: '賽段', kmh: 'km/h',
     speedMap: '速度地圖', speedMapHint: '依速度上色：綠快、紅慢。🚦＝停等。',
+    mapTapHint: '點彎道或賽段查看細節 · 捲動或雙指縮放。',
+    tapPrompt: '點地圖上的彎道或賽段，看該處的數據。',
+    zoomIn: '放大', zoomOut: '縮小', zoomReset: '重設視圖',
     slow: '慢', fast: '快',
-    cornerSpeeds: '彎道與直線速度', topStraight: '直線最高速', slowestCorner: '最慢彎', avgCorner: '彎道平均',
+    cornerSpeeds: '彎道與直線速度', cornerChart: '彎道速度圖表',
+    topStraight: '直線最高速', slowestCorner: '最慢彎', avgCorner: '彎道平均',
     corner: '彎道', straightLbl: '直線', turn: '轉角',
+    sectorWord: '賽段', cornerWord: '彎道', speedWord: '速度', timeWord: '時間', distanceWord: '距離',
     sectorAnalysis: '分段分析', legPurple: '新最速', legGreen: '時段最速', legYellow: '較慢',
     best: '最速', first: '首圈', avg: '均速', max: '最高', ofLap: '佔全程',
     idealLap: '理論最速圈', idealSub: '由每段的歷史最速拼成。', thisLapIs: '本圈', toFind: '可再進步',
@@ -372,91 +382,133 @@ function speedColor(frac) {
   return `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
 }
 
-// The hero: a stylised track drawn from the route, each segment coloured by the
-// speed driven there, with corner-speed labels, stop flags and start/finish.
-function speedMapSvg(data) {
+// Projected geometry for the speed map. Pure & cheap, so both the SVG builder
+// and the interaction wiring recompute it rather than passing a closure around.
+const MAP_W = 1000, MAP_H = 620, MAP_PAD = 78;
+function computeMapGeom(data) {
   const points = data.route.points || [];
-  if (points.length < 2) return '';
   const cum = data.route.cum;
-  const W = 1000, H = 620, PAD = 78;
-  const { project } = computeProjection(points, { width: W, height: H, pad: PAD });
+  if (points.length < 2) return null;
+  const { project } = computeProjection(points, { width: MAP_W, height: MAP_H, pad: MAP_PAD });
   const xy = points.map(project);
+  const spans = sectorSpans(data.route);
+  const sectorOf = d => (spans.find(sp => d >= sp.startM && d < sp.endM) ?? spans[spans.length - 1]).index;
 
-  // Per-segment speed: telemetry samples if present, else the sector average.
-  const segSpeed = [];
+  const segments = [];
   for (let i = 0; i < points.length - 1; i++) {
     const mid = (cum[i] + cum[i + 1]) / 2;
     let kmh = data.hasTelemetry ? speedAtDistance(data.samples, mid, Math.max(30, cum[i + 1] - cum[i])) : null;
-    if (kmh == null) {
-      const sec = data.sectors.find((_, si) => mid >= sectorSpans(data.route)[si].startM &&
-        mid < sectorSpans(data.route)[si].endM);
-      kmh = sec ? (sec.avgKmh ?? sec.splitAvgKmh) : null;
-    }
-    segSpeed.push(kmh);
+    if (kmh == null) { const s = data.sectors[sectorOf(mid)]; kmh = s ? (s.avgKmh ?? s.splitAvgKmh) : null; }
+    segments.push({ i, sector: sectorOf(mid), p1: xy[i], p2: xy[i + 1], kmh });
   }
-  const known = segSpeed.filter(v => v != null);
-  const lo = known.length ? Math.min(...known) : 0;
-  const hi = known.length ? Math.max(...known) : 1;
+  const known = segments.map(s => s.kmh).filter(v => v != null);
+  const lo = known.length ? Math.min(...known) : 0, hi = known.length ? Math.max(...known) : 1;
   const norm = v => (hi - lo) < 1e-6 ? 0.5 : (v - lo) / (hi - lo);
+  segments.forEach(s => { s.color = s.kmh != null ? speedColor(norm(s.kmh)) : '#b8b8c0'; });
 
-  // casing under everything
+  const corners = detectCorners(points).map(c => {
+    const [cx, cy] = project(c.point);
+    return {
+      number: c.number, xy: [cx, cy], labelXY: [cx + c.outward[0] * 40, cy + c.outward[1] * 40],
+      speedKmh: data.hasTelemetry ? speedAtDistance(data.samples, c.distance) : null,
+      turnDeg: Math.abs(c.turn), sector: sectorOf(c.distance), distanceM: c.distance,
+    };
+  });
+  const stops = data.stops.filter(s => s.atM != null)
+    .map(s => ({ ...s, xy: project(pointAtDistance(points, cum, s.atM)) }));
+  return { W: MAP_W, H: MAP_H, viewBox: [0, 0, MAP_W, MAP_H], xy, segments, corners, stops, spans };
+}
+
+// The hero: a stylised track, each segment coloured by the speed driven there,
+// with tappable corner markers, stop flags and start/finish. Interaction (zoom,
+// pan, tap-to-inspect) is wired separately in wireSpeedMap.
+function speedMapSvg(data, geom) {
+  if (!geom) return '';
+  const { xy, segments, corners, stops } = geom;
   let svg = `<path d="${xy.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ')}"
     fill="none" stroke="#d7d7dd" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>`;
-  // each segment in its speed colour
-  for (let i = 0; i < points.length - 1; i++) {
-    const [x1, y1] = xy[i], [x2, y2] = xy[i + 1];
-    const col = segSpeed[i] != null ? speedColor(norm(segSpeed[i])) : '#b8b8c0';
-    svg += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"
-      stroke="${col}" stroke-width="13" stroke-linecap="round"/>`;
+  for (const s of segments) {
+    svg += `<line x1="${s.p1[0].toFixed(1)}" y1="${s.p1[1].toFixed(1)}" x2="${s.p2[0].toFixed(1)}" y2="${s.p2[1].toFixed(1)}"
+      stroke="${s.color}" stroke-width="13" stroke-linecap="round"/>`;
   }
-
-  // start / finish tick
   const [sx, sy] = xy[0], [sx2, sy2] = xy[1];
   const sl = Math.hypot(sx2 - sx, sy2 - sy) || 1;
   const spx = -(sy2 - sy) / sl, spy = (sx2 - sx) / sl;
   svg += `<line x1="${(sx - spx * 26).toFixed(1)}" y1="${(sy - spy * 26).toFixed(1)}"
     x2="${(sx + spx * 26).toFixed(1)}" y2="${(sy + spy * 26).toFixed(1)}" stroke="#15151e" stroke-width="7"/>`;
 
-  // corner markers + speed labels
-  for (const c of detectCorners(points)) {
-    const [cx, cy] = project(c.point);
-    const ox = cx + c.outward[0] * 40, oy = cy + c.outward[1] * 40;
-    svg += `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="15" fill="#fff" stroke="#15151e" stroke-width="3"/>`;
-    svg += `<text x="${cx.toFixed(1)}" y="${cy.toFixed(1)}" class="dt-map-cnum" text-anchor="middle" dominant-baseline="central">${c.number}</text>`;
-    const spd = data.hasTelemetry ? speedAtDistance(data.samples, c.distance) : null;
-    if (spd != null) {
-      svg += `<text x="${ox.toFixed(1)}" y="${oy.toFixed(1)}" class="dt-map-cspd" text-anchor="middle" dominant-baseline="central">${Math.round(spd)}</text>`;
+  // selection highlight layer (populated on tap)
+  svg += `<g class="dt-map-overlay"></g>`;
+
+  for (const c of corners) {
+    svg += `<circle cx="${c.xy[0].toFixed(1)}" cy="${c.xy[1].toFixed(1)}" r="15" fill="#fff" stroke="#15151e" stroke-width="3"/>`;
+    svg += `<text x="${c.xy[0].toFixed(1)}" y="${c.xy[1].toFixed(1)}" class="dt-map-cnum" text-anchor="middle" dominant-baseline="central">${c.number}</text>`;
+    if (c.speedKmh != null) {
+      svg += `<text x="${c.labelXY[0].toFixed(1)}" y="${c.labelXY[1].toFixed(1)}" class="dt-map-cspd" text-anchor="middle" dominant-baseline="central">${Math.round(c.speedKmh)}</text>`;
     }
   }
-
-  // stop flags
-  for (const s of data.stops) {
-    if (s.atM == null) continue;
-    const [x, y] = project(pointAtDistance(points, cum, s.atM));
-    svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="17" fill="#15151e"/>`;
-    svg += `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="20">🚦</text>`;
+  for (const s of stops) {
+    svg += `<circle cx="${s.xy[0].toFixed(1)}" cy="${s.xy[1].toFixed(1)}" r="17" fill="#15151e"/>`;
+    svg += `<text x="${s.xy[0].toFixed(1)}" y="${s.xy[1].toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="20">🚦</text>`;
   }
-
-  return `<svg class="dt-map-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Speed map">${svg}</svg>`;
+  return `<svg class="dt-map-svg" viewBox="0 0 ${MAP_W} ${MAP_H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Speed map">${svg}</svg>`;
 }
 
-function speedProfileSvg(data) {
+// A bar chart of each corner's speed — the "彎道速度圖表" the sheet lists below
+// the map. Bars are coloured on the same slow→fast scale as the map.
+function cornerChartSvg(data) {
+  const cs = data.corners.filter(c => c.speedKmh != null);
+  if (cs.length < 1) return '';
+  const hi = Math.max(...cs.map(c => c.speedKmh));
+  const cols = cs.map(c => {
+    const h = hi > 0 ? (c.speedKmh / hi) * 100 : 0;
+    const slow = c.number === data.speedStats.slowestCornerNumber;
+    return `<div class="dt-cbar-col${slow ? ' slow' : ''}">
+      <div class="dt-cbar-val">${Math.round(c.speedKmh)}</div>
+      <div class="dt-cbar-track"><div class="dt-cbar" style="height:${h.toFixed(1)}%"></div></div>
+      <div class="dt-cbar-lbl">T${c.number}</div>
+    </div>`;
+  }).join('');
+  return `<div class="dt-cchart"><div class="dt-cchart-yaxis"><span>${Math.round(hi)}</span><span>0</span></div>
+    <div class="dt-cchart-bars">${cols}</div></div>
+    <div class="dt-cchart-cap">${L('kmh')} · ${L('cornerWord')}</div>`;
+}
+
+// Speed vs distance, with a labelled speed axis (km/h) and a sector axis.
+function profileBlock(data) {
   const total = data.overall.distanceM || 1;
   const pts = data.samples.filter(s => s.atM != null && s.speedMps <= NOISE_MAX_MPS)
     .map(s => ({ x: s.atM / total, v: mps2kmh(s.speedMps) })).sort((a, b) => a.x - b.x);
   if (pts.length < 2) return '';
   const W = 1000, H = 240, padB = 4;
-  const vmax = Math.max(20, ...pts.map(p => p.v)) * 1.1;
+  const vmax = Math.ceil(Math.max(20, ...pts.map(p => p.v)) * 1.1 / 10) * 10;
   const X = x => x * W, Y = v => H - padB - (v / vmax) * (H - padB);
   const line = pts.map((p, i) => `${i ? 'L' : 'M'}${X(p.x).toFixed(1)},${Y(p.v).toFixed(1)}`).join(' ');
   const area = `${line} L${X(pts.at(-1).x).toFixed(1)},${H} L${X(pts[0].x).toFixed(1)},${H} Z`;
   const spans = sectorSpans(data.route);
-  const grid = spans.slice(1).map(sp =>
-    `<line x1="${X(sp.startM / total).toFixed(1)}" y1="0" x2="${X(sp.startM / total).toFixed(1)}" y2="${H}" class="dt-grid"/>`).join('');
+  // horizontal speed gridlines at 0, ¼, ½, ¾, max
+  const hGrid = [0.25, 0.5, 0.75].map(f =>
+    `<line x1="0" y1="${Y(vmax * f).toFixed(1)}" x2="${W}" y2="${Y(vmax * f).toFixed(1)}" class="dt-grid"/>`).join('');
+  const vGrid = spans.slice(1).map(sp =>
+    `<line x1="${X(sp.startM / total).toFixed(1)}" y1="0" x2="${X(sp.startM / total).toFixed(1)}" y2="${H}" class="dt-grid dt-grid-sector"/>`).join('');
   const stopMarks = data.stops.filter(s => s.atM != null).map(s =>
     `<line x1="${X(s.atM / total).toFixed(1)}" y1="0" x2="${X(s.atM / total).toFixed(1)}" y2="${H}" class="dt-stopmark"/>`).join('');
-  return `<svg class="dt-profile-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Speed profile">
-    ${grid}<path d="${area}" class="dt-profile-area"/><path d="${line}" class="dt-profile-line" fill="none"/>${stopMarks}</svg>`;
+  const svg = `<svg class="dt-profile-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Speed profile">
+    ${hGrid}${vGrid}<path d="${area}" class="dt-profile-area"/><path d="${line}" class="dt-profile-line" fill="none"/>${stopMarks}</svg>`;
+  // y-axis labels (km/h), positioned by percentage to match the stretched svg
+  const yLabels = [1, 0.75, 0.5, 0.25, 0].map(f =>
+    `<span style="top:${((1 - f) * 100).toFixed(1)}%">${Math.round(vmax * f)}</span>`).join('');
+  // x-axis: sector label centred within each sector's span
+  const xLabels = spans.map(sp => {
+    const c = ((sp.startM + sp.endM) / 2) / total * 100;
+    return `<span style="left:${c.toFixed(1)}%">S${sp.index + 1}</span>`;
+  }).join('');
+  return `<div class="dt-profile">
+    <div class="dt-profile-yunit">${L('kmh')}</div>
+    <div class="dt-profile-plot"><div class="dt-profile-yaxis">${yLabels}</div>${svg}</div>
+    <div class="dt-profile-xaxis">${xLabels}</div>
+    <div class="dt-profile-xunit">${L('sectorWord').toUpperCase()}</div>
+  </div>`;
 }
 
 function bar(fraction, cls) {
@@ -563,8 +615,9 @@ export function renderDetail(container, data) {
         ${L('toFind')} <b class="slower">${data.ideal.timeLostVsIdealMs != null ? '+' + (data.ideal.timeLostVsIdealMs / 1000).toFixed(3) : '—'}</b></div>
     </div></section>` : '';
 
-  const map = speedMapSvg(data);
-  const profile = speedProfileSvg(data);
+  const geom = computeMapGeom(data);
+  const map = speedMapSvg(data, geom);
+  const profile = profileBlock(data);
 
   container.innerHTML = `
     <article class="dt-sheet${data.disqualified ? ' dt-sheet-dsq' : ''}">
@@ -592,12 +645,20 @@ export function renderDetail(container, data) {
         ${statTile(Math.round((data.conformance ?? 1) * 100) + '', '%', L('conformance'))}
       </section>
 
-      ${map ? `<section class="dt-sec"><div class="dt-bar"><span>${L('speedMap')}</span></div>
-        <div class="dt-map">${map}</div>
+      ${map ? `<section class="dt-sec dt-sec-map"><div class="dt-bar"><span>${L('speedMap')}</span></div>
+        <div class="dt-map">${map}
+          <div class="dt-map-ctrl">
+            <button type="button" data-zoom="in" aria-label="${esc(L('zoomIn'))}" title="${esc(L('zoomIn'))}">＋</button>
+            <button type="button" data-zoom="out" aria-label="${esc(L('zoomOut'))}" title="${esc(L('zoomOut'))}">－</button>
+            <button type="button" data-zoom="reset" aria-label="${esc(L('zoomReset'))}" title="${esc(L('zoomReset'))}">⟲</button>
+          </div>
+        </div>
         <div class="dt-map-legend"><span>${L('slow')}</span><span class="dt-map-scale"></span><span>${L('fast')}</span></div>
-        <p class="dt-hint">${L('speedMapHint')}</p></section>` : ''}
+        <div class="dt-map-info dt-map-info-empty">${L('tapPrompt')}</div>
+        <p class="dt-hint">${L('mapTapHint')}</p></section>` : ''}
 
-      ${data.corners.length ? `<section class="dt-sec"><div class="dt-bar"><span>${L('cornerSpeeds')}</span></div>${cornerSection(data)}</section>` : ''}
+      ${data.corners.length ? `<section class="dt-sec"><div class="dt-bar"><span>${L('cornerSpeeds')}</span></div>
+        ${cornerChartSvg(data)}${cornerSection(data)}</section>` : ''}
 
       ${ideal}
 
@@ -606,8 +667,7 @@ export function renderDetail(container, data) {
         <div class="dt-sectors">${data.sectors.map(s => sectorRow(s, maxTime)).join('')}</div>
       </section>
 
-      ${profile ? `<section class="dt-sec"><div class="dt-bar"><span>${L('speedProfile')}</span></div>
-        <div class="dt-profile">${profile}<div class="dt-profile-axis"><span>${L('start')}</span><span>${L('finish')}</span></div></div></section>` : ''}
+      ${profile ? `<section class="dt-sec"><div class="dt-bar"><span>${L('speedProfile')}</span></div>${profile}</section>` : ''}
 
       <section class="dt-sec"><div class="dt-bar"><span>${L('stops')}</span></div>${stopsSection(data)}</section>
 
@@ -615,6 +675,175 @@ export function renderDetail(container, data) {
 
       <footer class="dt-foot">${L('footer')}</footer>
     </article>`;
+
+  if (geom) wireSpeedMap(container, data, geom);
+}
+
+// ---- interactive speed map: zoom / pan / pinch + tap-to-inspect ----
+
+const SVGNS = 'http://www.w3.org/2000/svg';
+function svgNode(tag, attrs) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  return e;
+}
+
+function wireSpeedMap(container, data, geom) {
+  const svg = container.querySelector('.dt-map-svg');
+  const section = container.querySelector('.dt-sec-map');
+  if (!svg || !section) return;
+  const overlay = svg.querySelector('.dt-map-overlay');
+  const info = section.querySelector('.dt-map-info');
+  const base = geom.viewBox;
+  let vb = [...base];
+
+  const setVB = () => svg.setAttribute('viewBox', vb.map(n => n.toFixed(2)).join(' '));
+  const clamp = () => {
+    const minW = base[2] / 8;
+    vb[2] = Math.min(base[2], Math.max(minW, vb[2]));
+    vb[3] = vb[2] * base[3] / base[2];
+    vb[0] = Math.max(base[0], Math.min(base[0] + base[2] - vb[2], vb[0]));
+    vb[1] = Math.max(base[1], Math.min(base[1] + base[3] - vb[3], vb[1]));
+  };
+  const toSvg = (cx, cy) => {
+    const r = svg.getBoundingClientRect();
+    return [vb[0] + (cx - r.left) / (r.width || 1) * vb[2], vb[1] + (cy - r.top) / (r.height || 1) * vb[3]];
+  };
+  const zoomAt = (cx, cy, factor) => {
+    const [ax, ay] = toSvg(cx, cy);
+    const rx = (ax - vb[0]) / vb[2], ry = (ay - vb[1]) / vb[3];
+    vb[2] /= factor; vb[3] = vb[2] * base[3] / base[2];
+    vb[0] = ax - rx * vb[2]; vb[1] = ay - ry * vb[3];
+    clamp(); setVB();
+  };
+  // fit a projected bounding box (padded) into the view, keeping base aspect
+  const fitTo = (xs, ys, padFrac = 0.4) => {
+    let minx = Math.min(...xs), maxx = Math.max(...xs), miny = Math.min(...ys), maxy = Math.max(...ys);
+    let w = Math.max(maxx - minx, (maxy - miny) * base[2] / base[3]) * (1 + padFrac);
+    w = Math.max(base[2] / 8, w);
+    const cx = (minx + maxx) / 2, cy = (miny + maxy) / 2;
+    vb = [cx - w / 2, cy - w * base[3] / base[2] / 2, w, w * base[3] / base[2]];
+    clamp(); setVB();
+  };
+
+  // --- selection + info ---
+  const clearSel = () => { while (overlay.firstChild) overlay.removeChild(overlay.firstChild); };
+  const selectCorner = (c) => {
+    clearSel();
+    overlay.appendChild(svgNode('circle', { cx: c.xy[0], cy: c.xy[1], r: 26, class: 'dt-sel-ring' }));
+    fitTo([c.xy[0]], [c.xy[1]], 3);   // zoom toward the corner
+    // widen a touch so the corner isn't pinned dead-centre at max zoom
+    vb[2] = Math.min(base[2], base[2] / 3.2); vb[3] = vb[2] * base[3] / base[2];
+    vb[0] = c.xy[0] - vb[2] / 2; vb[1] = c.xy[1] - vb[3] / 2; clamp(); setVB();
+    info.className = 'dt-map-info';
+    info.innerHTML = `<span class="dt-mi-tag" style="background:${speedColor(1)}">T${c.number}</span>
+      <span class="dt-mi-main">${fmtSpeed(c.speedKmh)} <i>${L('kmh')}</i></span>
+      <span class="dt-mi-sub">${L('cornerWord')} · ${Math.round(c.turnDeg)}° ${L('turn')} · S${c.sector + 1} · ${L('fromStart')} ${fmtDist(c.distanceM)}</span>`;
+  };
+  const selectSector = (i) => {
+    clearSel();
+    const segs = geom.segments.filter(s => s.sector === i);
+    if (!segs.length) return;
+    for (const s of segs) {
+      overlay.appendChild(svgNode('line', {
+        x1: s.p1[0], y1: s.p1[1], x2: s.p2[0], y2: s.p2[1], class: 'dt-sel-seg',
+      }));
+    }
+    fitTo(segs.flatMap(s => [s.p1[0], s.p2[0]]), segs.flatMap(s => [s.p1[1], s.p2[1]]));
+    const sec = data.sectors[i];
+    info.className = 'dt-map-info';
+    const stopTxt = sec.stopCount ? ` · 🚦 ${sec.stopCount} · ${fmtDuration(sec.stoppedMs)}` : '';
+    info.innerHTML = `<span class="dt-mi-tag dt-mi-${sec.color || 'none'}">S${i + 1}</span>
+      <span class="dt-mi-main">${fmtTime(sec.timeMs)}</span>
+      <span class="dt-mi-sub">${L('avg')} ${fmtSpeed(sec.avgKmh)} · ${L('max')} ${fmtSpeed(sec.maxKmh)} ${L('kmh')} · ${fmtDist(sec.distanceM)}${stopTxt}</span>`;
+  };
+
+  const handleTap = (cx, cy) => {
+    const [sx, sy] = toSvg(cx, cy);
+    let bestC = null, bcd = Infinity;
+    for (const c of geom.corners) {
+      const d = Math.hypot(c.xy[0] - sx, c.xy[1] - sy);
+      if (d < bcd) { bcd = d; bestC = c; }
+    }
+    if (bestC && bcd <= 34) { selectCorner(bestC); return; }
+    // else nearest segment → its sector
+    let bestS = null, bsd = Infinity;
+    for (const s of geom.segments) {
+      const mx = (s.p1[0] + s.p2[0]) / 2, my = (s.p1[1] + s.p2[1]) / 2;
+      const d = Math.hypot(mx - sx, my - sy);
+      if (d < bsd) { bsd = d; bestS = s; }
+    }
+    if (bestS) selectSector(bestS.sector);
+  };
+
+  // --- gestures ---
+  svg.addEventListener('wheel', e => {
+    e.preventDefault();
+    zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.0015));
+  }, { passive: false });
+
+  const pts = new Map();
+  let drag = null, pinch = null, moved = 0;
+  svg.style.touchAction = 'none';
+  svg.addEventListener('pointerdown', e => {
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    moved = 0;
+    if (pts.size === 1) drag = { cx: e.clientX, cy: e.clientY, vb: [...vb] };
+    else if (pts.size === 2) {
+      const [a, b] = [...pts.values()];
+      pinch = { d: Math.hypot(b.x - a.x, b.y - a.y) || 1, mid: [(a.x + b.x) / 2, (a.y + b.y) / 2], vb: [...vb] };
+      drag = null;
+    }
+    try { svg.setPointerCapture?.(e.pointerId); } catch { /* optional */ }
+  });
+  const onMove = e => {
+    if (!pts.has(e.pointerId)) return;
+    const prev = pts.get(e.pointerId);
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    moved += Math.hypot(e.clientX - prev.x, e.clientY - prev.y);
+    const r = svg.getBoundingClientRect();
+    if (pinch && pts.size >= 2) {
+      const [a, b] = [...pts.values()];
+      const dist = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+      const factor = dist / pinch.d;
+      const srx = (pinch.mid[0] - r.left) / (r.width || 1), sry = (pinch.mid[1] - r.top) / (r.height || 1);
+      const anchorX = pinch.vb[0] + srx * pinch.vb[2], anchorY = pinch.vb[1] + sry * pinch.vb[3];
+      const mid = [(a.x + b.x) / 2, (a.y + b.y) / 2];
+      const crx = (mid[0] - r.left) / (r.width || 1), cry = (mid[1] - r.top) / (r.height || 1);
+      const w = pinch.vb[2] / factor;
+      vb = [anchorX - crx * w, anchorY - cry * w * base[3] / base[2], w, w * base[3] / base[2]];
+      clamp(); setVB();
+    } else if (drag && pts.size === 1) {
+      vb[0] = drag.vb[0] - (e.clientX - drag.cx) / (r.width || 1) * drag.vb[2];
+      vb[1] = drag.vb[1] - (e.clientY - drag.cy) / (r.height || 1) * drag.vb[3];
+      clamp(); setVB();
+    }
+  };
+  const onUp = e => {
+    if (!pts.has(e.pointerId)) return;
+    pts.delete(e.pointerId);
+    if (pts.size < 2) pinch = null;
+    if (pts.size === 0) {
+      if (moved < 6) handleTap(e.clientX, e.clientY);   // a tap, not a drag
+      drag = null;
+    }
+  };
+  svg.addEventListener('pointermove', onMove);
+  svg.addEventListener('pointerup', onUp);
+  svg.addEventListener('pointercancel', onUp);
+
+  // --- zoom buttons ---
+  const center = () => {
+    const r = svg.getBoundingClientRect();
+    return [r.left + r.width / 2, r.top + r.height / 2];
+  };
+  section.querySelector('[data-zoom="in"]')?.addEventListener('click', () => zoomAt(...center(), 1.6));
+  section.querySelector('[data-zoom="out"]')?.addEventListener('click', () => zoomAt(...center(), 1 / 1.6));
+  section.querySelector('[data-zoom="reset"]')?.addEventListener('click', () => {
+    vb = [...base]; setVB(); clearSel();
+    info.className = 'dt-map-info dt-map-info-empty';
+    info.textContent = L('tapPrompt');
+  });
 }
 
 // ---- overlay control ----
